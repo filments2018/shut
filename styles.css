@@ -899,7 +899,7 @@ button:focus-visible {
    カウントダウン中のガイドテキスト
    ============================================ */
 .vf-guide-text.dim {
-  opacity: 0.18;
+  opacity: 0.40;
   /* letter-spacing を変えるとレイアウトシフトが起きるため使用しない */
 }
 

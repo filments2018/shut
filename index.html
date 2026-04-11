@@ -262,7 +262,10 @@
   <!-- フレーバーテキスト / タイムスタンプ -->
   <div class="complete-meta" id="complete-meta"></div>
 
-  <!-- プライマリアクション（最初に目に入る位置） -->
+  <!-- 動画プレビュー（録画データがある場合のみ表示） -->
+  <div id="video-preview-wrap" style="display:none"></div>
+
+  <!-- プライマリアクション -->
   <div class="complete-actions">
     <div class="complete-actions-row1">
       <button class="btn-share"    id="btn-share" aria-label="動画をシェア">SHARE →</button>
@@ -272,9 +275,6 @@
       <button class="btn-retry"    id="btn-retry">▶ もう一度</button>
     </div>
   </div>
-
-  <!-- 動画プレビュー（録画データがある場合のみ表示） -->
-  <div id="video-preview-wrap" style="display:none"></div>
 
   <!-- サブアクション -->
   <button class="btn-copy-url" id="btn-copy-url">URLをコピー</button>

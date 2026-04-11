@@ -480,7 +480,14 @@ function gotoRecording() {
 
   // beatPulse に拍番号を渡す（強拍で強いビジュアル）
   Audio.start(m.bpm, beatIdx => UI.beatPulse(beatIdx));
-  if (State.recEnabled) Recorder.startClip();
+  // 1本の連続録画: 最初のクリップのみ start、以降は resume
+  if (State.recEnabled) {
+    if (State.clips === 0) {
+      Recorder.startClip();
+    } else {
+      Recorder.resumeClip();
+    }
+  }
   // 実際の録画解像度を1.5秒表示
   if (State.clips === 0 && Camera.isActive()) {
     const s = Camera.getActualSettings();
@@ -491,25 +498,19 @@ function gotoRecording() {
   UI.startRecBar(dur, () => { gotoShutter(); }, m.bpm);
 }
 
-async function gotoShutter() {
+function gotoShutter() {
   _clearTimers();
-  State.phase = 'processing';  // stopClip中のexecuteShut誤発火を防止
-  // stop()ではなくfreezeForTiming()を使うことで
-  // _nextBeat/_bpmを保持してタイミング評価を正確にする
+  State.phase = 'shutter';
+  // freezeForTiming() で _nextBeat/_bpm を保持してタイミング評価を正確にする
   Audio.freezeForTiming();
   UI.stopRecBar();
   UI.hideRecIndicator();
+  UI.cancelShutterCountdown();
 
-  UI.cancelShutterCountdown(); // 前回のカウントダウンを確実に停止
+  // 録画を一時停止（stop ではなく pause → gotoComplete で1回だけ stop）
   if (State.recEnabled && Recorder.isRecording()) {
-    UI.setCenter('processing');
-    UI.setHudStatus('<span class="processing-hud">● REC SAVING</span>');
-    await Recorder.stopClip();
+    Recorder.pauseClip();
   }
-
-  // await 中に gotoSelect/gotoComplete 等が呼ばれた場合の安全ガード
-  if (State.phase !== 'processing') return;
-  State.phase = 'shutter';
 
   UI.setCenter('shutter');
   UI.setGuideText('', false);
@@ -521,7 +522,6 @@ async function gotoShutter() {
   Motion.resetCooldown();
 
   // シュット待機タイムアウト（8秒で自動的に次クリップへ）
-  // カウントダウンで緊張感を演出
   UI.startShutterCountdown(8, () => {
     // タイムアウト時: MISS表示 + 警告音 → 録画に戻る
     if (State.phase !== 'shutter') return;
@@ -530,7 +530,7 @@ async function gotoShutter() {
     UI.showGradePopup('MISS', 0);
     Audio.playWarning();
     _vibrate([20, 20, 20]);
-    _T(gotoRecording, 600); // MISS表示が見えるよう少し延長
+    _T(gotoRecording, 600);
   });
 }
 
@@ -627,7 +627,7 @@ function _calcTitle(scores) {
   return                                  { title: 'KEEP RHYTHM!',   stars: 1 };
 }
 
-function gotoComplete() {
+async function gotoComplete() {
   _clearTimers();
   State.phase = 'complete';
   Motion.setActive(false);
@@ -635,9 +635,17 @@ function gotoComplete() {
   Camera.stop();
   UI.hideFlipBtn();
   UI.updateRemainingClips(0, CLIPS_NEEDED);
-  Audio.playComplete();
-  _vibrate([40, 20, 40, 20, 80]); // 完成の祝福振動（短縮）
   _checkOrientation();
+
+  // 1本の連続録画を停止してBlobを取得
+  if (State.recEnabled && (Recorder.isRecording() || Recorder.isPaused())) {
+    UI.setHudStatus('<span class="processing-hud">● 保存中...</span>');
+    const saveTimeout = new Promise(res => setTimeout(res, 5000));
+    await Promise.race([Recorder.stopClip(), saveTimeout]);
+  }
+
+  Audio.playComplete();
+  _vibrate([40, 20, 40, 20, 80]);
 
   // 録画データを取得しキャッシュ（btn-share でも再利用）
   const _finalBlob = State.recEnabled ? Recorder.getFinalBlob() : null;
@@ -682,9 +690,12 @@ function gotoComplete() {
       btnDl.style.display = 'inline-block';
       btnDl.textContent   = '⬇ 保存 (' + sizeMB + 'MB)';
       btnDl.addEventListener('click', () => {
+        if (btnDl.disabled) return;
+        btnDl.disabled = true;
         Share.download(_finalBlob, { label: State.mode.label, bpm: State.mode.bpm });
         UI.showToast('⬇ 動画を保存しています...');
-      }, { once: true });
+        setTimeout(() => { btnDl.disabled = false; }, 3000);
+      });
     }, 400);
   }
 }

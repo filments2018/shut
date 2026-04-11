@@ -22,12 +22,18 @@ const Motion = (() => {
 
   // ハイパスフィルタ用（重力成分を保持）
   let _gravX = 0, _gravY = 0, _gravZ = 0;
+  let _gravSeeded = false; // 初回サンプルで重力をシード（収束遅延を防止）
   // ローパスフィルタ用（表示用スムーズ値）
   let _smoothMag = 0;
 
   // ── ハイパスフィルタで重力成分を除去 ──────────
   // accelerationIncludingGravity から純粋な加速度を算出
   function _highpass(x, y, z) {
+    if (!_gravSeeded) {
+      // 初回サンプルで重力をシード（0からの収束による誤検出を防止）
+      _gravX = x; _gravY = y; _gravZ = z;
+      _gravSeeded = true;
+    }
     _gravX = HP_ALPHA * _gravX + (1 - HP_ALPHA) * x;
     _gravY = HP_ALPHA * _gravY + (1 - HP_ALPHA) * y;
     _gravZ = HP_ALPHA * _gravZ + (1 - HP_ALPHA) * z;

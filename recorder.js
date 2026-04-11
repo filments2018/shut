@@ -131,28 +131,31 @@ const Recorder = (() => {
     });
   }
 
-  /** バックグラウンド時に録画を一時停止 */
+  /** クリップ間の一時停止（pause非対応環境ではstopClipに自動フォールバック） */
   function pauseClip() {
     if (!_recorder || _recorder.state !== 'recording') return;
     try {
       _recorder.pause();
       _paused = true;
-      //console.log('[Recorder] 一時停止');
     } catch (e) {
-      console.warn('[Recorder] pause未対応:', e.message);
+      // iOS Safari など pause 未対応環境: pause できなくても録画は継続
+      // gotoComplete で stopClip() が呼ばれるまでそのまま録画継続
+      console.warn('[Recorder] pause未対応、録画継続:', e.message);
     }
   }
 
-  /** フォアグラウンド復帰時に録画を再開 */
+  /** クリップ間の録画再開（pause非対応環境では state が recording のままなので何もしない） */
   function resumeClip() {
-    if (!_recorder || _recorder.state !== 'paused') return;
-    try {
-      _recorder.resume();
-      _paused = false;
-      //console.log('[Recorder] 再開');
-    } catch (e) {
-      console.warn('[Recorder] resume未対応:', e.message);
+    if (!_recorder) return;
+    if (_recorder.state === 'paused') {
+      try {
+        _recorder.resume();
+        _paused = false;
+      } catch (e) {
+        console.warn('[Recorder] resume未対応:', e.message);
+      }
     }
+    // state === 'recording' の場合 (pause未対応環境) はそのまま録画継続中
   }
 
   function getFinalBlob() {

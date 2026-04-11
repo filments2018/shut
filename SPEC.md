@@ -1,6 +1,6 @@
 # SHUT — スマホ撮影レシピ 仕様書
 
-> Version: v28 | Updated: 2026-04-11
+> Version: v30 | Updated: 2026-04-11
 
 ---
 
