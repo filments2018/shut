@@ -1,0 +1,48 @@
+# ============================================
+# SHUT — Netlify デプロイ設定
+# ============================================
+
+[build]
+  publish = "."   # ルートディレクトリをそのまま公開
+
+# ── HTTPヘッダー ──────────────────────────────
+# DeviceMotionEvent / カメラ / オーディオのために
+# Permissions-Policy と HTTPS強制が必須
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # HTTPS 強制（センサー許可に必要）
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    # クロスオリジン分離（SharedArrayBuffer使用時に必要）
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Embedder-Policy = "credentialless"
+    # モーションセンサー・カメラ・マイクの許可ポリシー
+    Permissions-Policy = "accelerometer=*, gyroscope=*, camera=*, microphone=*"
+    # XSS防止
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# ── Service Worker のキャッシュ制御 ──────────────
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# ── 静的アセットのキャッシュ ──────────────────────
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+# ── SPA リダイレクト（将来的なルーティング対応） ──
+[[redirects]]
+  from = "/*"
+  to   = "/index.html"
+  status = 200

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SHUT">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#000814">
+  <meta property="og:title"       content="SHUT — スマホ撮影レシピ">
+  <meta property="og:description" content="カメラワークを選んで、ガイド通りに撮るだけ。ショート動画の素材が作れる。">
+  <meta property="og:type"        content="website">
+  <meta property="og:image"       content="/icon-512.svg">
+  <meta property="og:url"         content="https://shut.app/">
+  <meta name="twitter:card"       content="summary_large_image">
+  <meta name="twitter:title"      content="SHUT — スマホ撮影レシピ">
+  <meta name="twitter:description" content="カメラワークを選んで、ガイド通りに撮るだけ。ショート動画の素材が作れる。">
+  <meta name="twitter:image"      content="/icon-512.svg">
+  <meta name="description"        content="カメラワークを選んで、ガイド通りに4カット撮る。スマホだけでショート動画の素材を作れる撮影アプリ。">
+  <link rel="manifest"         href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.svg">
+  <title>SHUT — スマホ撮影レシピ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap"></noscript>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<noscript>
+  <div style="position:fixed;inset:0;z-index:9999;background:#000814;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:40px;text-align:center">
+    <div style="font-size:32px">🚫</div>
+    <div style="font-family:Arial,sans-serif;color:#fff;font-size:16px">JavaScriptが必要です</div>
+    <div style="font-family:Arial,sans-serif;color:rgba(255,255,255,0.5);font-size:13px">ブラウザの設定でJavaScriptを有効にしてください</div>
+  </div>
+</noscript>
+
+<!-- 横向き警告 -->
+<div id="orientation-warn">
+  <div class="warn-icon">📱</div>
+  <div class="warn-text">縦向きにしてください</div>
+</div>
+
+<!-- ── 0. スプラッシュ ── -->
+<div class="screen active" id="screen-splash">
+  <div class="splash-logo">SHUT</div>
+  <div class="splash-sub">BEAT-SYNC CAMERA</div>
+  <div class="splash-ring"></div>
+</div>
+
+<!-- ── 1. パーミッション ── -->
+<div class="screen" id="screen-permission">
+  <div class="perm-logo">SHUT</div>
+  <div class="perm-logo-sub">RECIPE CAMERA</div>
+  <div class="perm-icon">📱</div>
+  <div class="perm-title">センサー許可が必要</div>
+  <div class="perm-desc">
+    カメラワークの切れ目を「シュッ！」と決めるため、<br>加速度センサーへのアクセスを許可してください。
+  </div>
+  <div class="perm-steps">
+    <div class="perm-step">
+      <span class="perm-step-num">01</span>
+      <span class="perm-step-txt">下のボタンをタップ → 「許可」を選ぶ</span>
+    </div>
+    <div class="perm-step">
+      <span class="perm-step-num">02</span>
+      <span class="perm-step-txt">撮影レシピを選んでカメラを構える</span>
+    </div>
+    <div class="perm-step">
+      <span class="perm-step-num">03</span>
+      <span class="perm-step-txt">ガイド通りに動かして「SHUT!」で切る</span>
+    </div>
+  </div>
+  <button class="btn-primary" id="btn-permission">許可してスタート</button>
+  <p class="perm-note">※ iOSはSafariのみ対応。許可しない場合もタップで動作します。</p>
+</div>
+
+<!-- ── 1.5 チュートリアル（初回のみ） ── -->
+<div class="screen" id="screen-tutorial">
+  <div class="tut-header">
+    <div class="tut-logo">SHUT</div>
+    <div class="tut-logo-sub">HOW TO SHOOT</div>
+  </div>
+  <div class="tut-steps" id="tut-steps" role="region" aria-label="チュートリアル">
+    <div class="tut-step active" data-step="0" role="tabpanel">
+      <div class="tut-step-num">01</div>
+      <div class="tut-step-icon">🎬</div>
+      <div class="tut-step-title">レシピを選ぶ</div>
+      <div class="tut-step-desc">
+        <strong style="color:#00D4FF">WHIP</strong>・
+        <strong style="color:#22D3EE">COVER</strong>・
+        <strong style="color:#FF2D78">MATCH</strong><br>
+        撮りたいカメラワークから始める
+      </div>
+    </div>
+    <div class="tut-step" data-step="1" role="tabpanel">
+      <div class="tut-step-num">02</div>
+      <div class="tut-step-icon tut-arrow-anim">↑</div>
+      <div class="tut-step-title">ガイド通りに動く</div>
+      <div class="tut-step-desc">
+        画面の矢印と指示に合わせて<br>
+        始点・動き・終点を撮る
+      </div>
+    </div>
+    <div class="tut-step" data-step="2" role="tabpanel">
+      <div class="tut-step-num">03</div>
+      <div class="tut-step-icon tut-shake-anim">📱</div>
+      <div class="tut-step-title">シュッ！で切る</div>
+      <div class="tut-step-desc">
+        「SHUT!」が出たらスマホを素早く振る<br>
+        動きの切れ目にブラーとフラッシュが入る<br>
+        <span style="color:rgba(255,255,255,0.35);font-size:10px">前後1秒の余白を残すとつながりやすい</span>
+      </div>
+    </div>
+  </div>
+  <div class="tut-dots" id="tut-dots">
+    <span class="tut-dot active"></span>
+    <span class="tut-dot"></span>
+    <span class="tut-dot"></span>
+  </div>
+  <div class="tut-actions">
+    <button class="btn-primary" id="btn-tut-next">次へ</button>
+    <button class="tut-skip" id="btn-tut-skip">スキップ</button>
+  </div>
+</div>
+
+<!-- ── 2. モード選択 ── -->
+<div class="screen" id="screen-select">
+  <div class="select-header" style="position:relative">
+    <div class="select-logo">SHUT</div>
+  <div class="select-logo-sub">RECIPE CAMERA</div>
+    <button class="bgm-btn" id="btn-bgm" aria-label="BGM音楽を読み込む">🎵</button>
+    <input type="file" id="bgm-input" accept="audio/*" style="display:none">
+    <div class="bgm-indicator" id="bgm-indicator" style="display:none"></div>
+  </div>
+  <div class="bpm-visualizer" id="bpm-visualizer"></div>
+  <div class="modes" id="mode-list"></div>
+  <div class="how-to-box">
+    撮影前に被写体を長押しして <strong>AE/AFロック</strong><br>
+    脇を締めて、手だけでなく腰から <strong>スマホを動かす</strong><br>
+    <strong id="how-to-clips">4カット</strong> で撮影素材が完成
+  </div>
+</div>
+
+<!-- カメラ/マイク権限エラーオーバーレイ -->
+<div id="cam-error-overlay" style="display:none;position:fixed;inset:0;z-index:5000;
+  background:rgba(0,0,0,0.95);flex-direction:column;align-items:center;
+  justify-content:center;gap:20px;padding:40px;text-align:center">
+  <div style="font-size:48px">🚫</div>
+  <div style="font-family:var(--font-hd);font-size:18px;color:#FF2D78;letter-spacing:0.1em">
+    カメラにアクセスできません
+  </div>
+  <div style="font-family:var(--font-ui);font-size:12px;color:rgba(255,255,255,0.5);line-height:1.9;max-width:280px" id="cam-error-msg">
+    カメラの使用が許可されていません。
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:300px">
+    <div style="padding:12px 16px;border-radius:10px;background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.1);text-align:left">
+      <div style="font-family:var(--font-ui);font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.1em;margin-bottom:6px">iOS の場合</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.65);line-height:1.7">
+        設定 → Safari → カメラ → 許可
+      </div>
+    </div>
+    <div style="padding:12px 16px;border-radius:10px;background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.1);text-align:left">
+      <div style="font-family:var(--font-ui);font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.1em;margin-bottom:6px">Android の場合</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.65);line-height:1.7">
+        ブラウザのアドレスバー → 🔒 → カメラ → 許可
+      </div>
+    </div>
+  </div>
+  <button onclick="document.getElementById('cam-error-overlay').style.display='none';window.location.reload();"
+    style="padding:14px 36px;border-radius:50px;background:linear-gradient(135deg,#00D4FF,#0066FF);
+    border:none;cursor:pointer;font-family:var(--font-hd);font-size:13px;font-weight:700;
+    color:#000;letter-spacing:0.12em">
+    再試行
+  </button>
+  <button onclick="document.getElementById('cam-error-overlay').style.display='none';"
+    style="padding:10px 20px;border-radius:50px;background:transparent;
+    border:1px solid rgba(255,255,255,0.15);cursor:pointer;
+    font-family:var(--font-ui);font-size:11px;color:rgba(255,255,255,0.4)">
+    センサーのみで続ける
+  </button>
+</div>
+
+<!-- ── 3. ビューファインダー ── -->
+<div class="screen" id="screen-camera">
+  <div class="vf-wrap">
+    <div class="vf-main" id="vf-main">
+      <video id="cam" autoplay playsinline muted></video>
+      <div class="vf-gradient"></div>
+
+      <div class="rec-indicator" id="rec-indicator"></div>
+
+      <div class="corner tl"></div>
+      <div class="corner tr"></div>
+      <div class="corner bl"></div>
+      <div class="corner br"></div>
+
+      <div class="vf-center">
+        <div class="beat-ring-wrap">
+          <div class="beat-ring" id="beat-ring"></div>
+          <div class="beat-ring-mid"></div>
+          <div class="beat-ring-inner">
+            <div id="center-content"></div>
+          </div>
+        </div>
+        <div class="vf-guide-text" id="vf-guide-text"></div>
+      </div>
+
+      <!-- 残りクリップカウンタ -->
+      <div class="remaining-clips" id="remaining-clips"></div>
+
+      <!-- 加速度ゲージ -->
+      <div class="motion-gauge-wrap">
+        <div class="motion-gauge-track">
+          <div class="motion-gauge-fill" id="motion-gauge-fill"></div>
+        </div>
+        <div class="motion-gauge-label">G</div>
+      </div>
+
+      <!-- ミュートボタン -->
+      <button class="btn-mute" id="btn-mute" title="ミュート" aria-label="サウンドのミュート切替">🔊</button>
+
+      <!-- カメラ切替ボタン -->
+      <button class="btn-flip" id="btn-flip" title="カメラ切替" aria-label="フロント・リアカメラ切替">🔄</button>
+
+      <div class="scanlines"></div>
+    </div>
+
+    <div class="vf-hud">
+      <div class="rec-bar-wrap" id="rec-bar-wrap">
+        <div class="rec-bar-track">
+          <div class="rec-bar-fill" id="rec-bar-fill"></div>
+          <div class="rec-bar-markers" id="rec-bar-markers"></div>
+        </div>
+        <!-- シュット待機タイムアウトバー -->
+        <div class="shutter-timeout-bar" id="shutter-timeout-bar"></div>
+      </div>
+      <div class="clips-row" id="clips-row"></div>
+      <div class="hud-status" id="hud-status">READY</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 4. 完成 ── -->
+<div class="screen" id="screen-complete">
+  <canvas id="particle-canvas"></canvas>
+
+  <!-- ヘッダーエリア -->
+  <div class="complete-icon" aria-hidden="true">🎬</div>
+  <div class="complete-title" id="complete-title">VIDEO COMPLETE</div>
+
+  <!-- フィルムストリップ -->
+  <div class="film-strip" id="film-strip"></div>
+
+  <!-- スコア内訳パネル（音ゲー評価） -->
+  <div class="score-panel" id="score-panel" style="display:none"></div>
+
+  <!-- フレーバーテキスト / タイムスタンプ -->
+  <div class="complete-meta" id="complete-meta"></div>
+
+  <!-- プライマリアクション（最初に目に入る位置） -->
+  <div class="complete-actions">
+    <div class="complete-actions-row1">
+      <button class="btn-share"    id="btn-share" aria-label="動画をシェア">SHARE →</button>
+      <button class="btn-download" id="btn-download" style="display:none">⬇ 保存</button>
+    </div>
+    <div class="complete-actions-row2">
+      <button class="btn-retry"    id="btn-retry">▶ もう一度</button>
+    </div>
+  </div>
+
+  <!-- 動画プレビュー（録画データがある場合のみ表示） -->
+  <div id="video-preview-wrap" style="display:none"></div>
+
+  <!-- サブアクション -->
+  <button class="btn-copy-url" id="btn-copy-url">URLをコピー</button>
+  <button class="btn-install-pwa" id="btn-install-pwa">📱 ホーム画面に追加</button>
+</div>
+
+<!-- デバッグパネル（7連打で表示） -->
+<div id="debug-panel" style="display:none">
+  <div style="font-family:var(--font-hd);font-weight:700;margin-bottom:6px;letter-spacing:0.1em;font-size:12px">🛠 DEBUG</div>
+  <div>加速度: <span id="dbg-mag">0.0</span> m/s²</div>
+  <div>閾値:   <span id="dbg-thr">22</span> m/s²</div>
+  <div>フェーズ: <span id="dbg-phase">-</span></div>
+  <div>録画:   <span id="dbg-rec">-</span></div>
+  <div>センサー: <span id="dbg-sens">-</span></div>
+  <div>クリップ: <span id="dbg-clip">-</span></div>
+  <div style="margin-top:8px">
+    感度: <input id="dbg-sensitivity" type="range" min="8" max="40" value="22" aria-label="シュット感度"
+      style="width:120px;vertical-align:middle;accent-color:var(--c);margin-left:6px">
+  </div>
+  <div style="margin-top:8px">
+    解像度:
+    <span style="display:inline-flex;gap:4px;margin-left:6px">
+      <button onclick="Camera.setQuality('low');window._showQ(this)" style="padding:3px 6px;border-radius:4px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.25);color:var(--c);font-size:9px;font-family:var(--font-ui);cursor:pointer">480p</button>
+      <button onclick="Camera.setQuality('medium');window._showQ(this)" style="padding:3px 6px;border-radius:4px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.25);color:var(--c);font-size:9px;font-family:var(--font-ui);cursor:pointer">720p</button>
+      <button onclick="Camera.setQuality('high');window._showQ(this)" style="padding:3px 6px;border-radius:4px;background:rgba(0,212,255,0.3);border:1px solid var(--c);color:var(--c);font-size:9px;font-family:var(--font-ui);cursor:pointer">1080p</button>
+    </span>
+  </div>
+  <div style="margin-top:8px">
+    クリップ数:
+    <span class="clips-badge" id="clips-badge">
+      <button onclick="window._setClips(2)" id="cb-2">2</button>
+      <button onclick="window._setClips(4)" id="cb-4" class="active">4</button>
+      <button onclick="window._setClips(6)" id="cb-6">6</button>
+    </span>
+  </div>
+  <div style="margin-top:6px;color:rgba(255,255,255,0.3);font-size:9px">7連打でパネルを閉じる</div>
+</div>
+
+<script src="motion.js"></script>
+<script src="camera.js"></script>
+<script src="audio.js"></script>
+<script src="ui.js"></script>
+<script src="recorder.js"></script>
+<script src="share.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>

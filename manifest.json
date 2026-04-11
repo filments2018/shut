@@ -1,0 +1,66 @@
+{
+  "name": "SHUT — スマホ撮影レシピ",
+  "short_name": "SHUT",
+  "description": "カメラワークを選んで、ガイド通りに撮るだけ。ショート動画の素材が作れる。",
+  "id": "/",
+  "start_url": "/",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "portrait",
+  "background_color": "#000814",
+  "theme_color": "#000814",
+  "lang": "ja",
+  "scope": "/",
+  "prefer_related_applications": false,
+  "categories": ["photo", "video", "entertainment"],
+  "icons": [
+    {
+      "src": "icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "WHIPレシピで撮影",
+      "short_name": "WHIP",
+      "description": "右方向の素早いパンで場面をつなぐ",
+      "url": "/?mode=whip",
+      "icons": [{ "src": "icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "COVERレシピで撮影",
+      "short_name": "COVER",
+      "description": "レンズを隠して場面を切り替える",
+      "url": "/?mode=cover",
+      "icons": [{ "src": "icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "MATCHレシピで撮影",
+      "short_name": "MATCH",
+      "description": "同じ動きでカットを合わせる",
+      "url": "/?mode=match",
+      "icons": [{ "src": "icon-192.svg", "sizes": "192x192" }]
+    }
+  ]
+}

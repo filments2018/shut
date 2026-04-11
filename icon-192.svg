@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="32" fill="#000814"/>
+  <!-- ビートリング -->
+  <circle cx="96" cy="96" r="72" fill="none" stroke="#00D4FF" stroke-width="3" opacity="0.4"/>
+  <circle cx="96" cy="96" r="52" fill="none" stroke="#00D4FF" stroke-width="1.5" opacity="0.2"/>
+  <!-- S文字 -->
+  <text x="96" y="126" font-size="96" font-weight="900" font-family="Arial Black, Impact, sans-serif"
+        fill="#00D4FF" text-anchor="middle" letter-spacing="-4">S</text>
+  <!-- グロー -->
+  <circle cx="96" cy="96" r="72" fill="none" stroke="#00D4FF" stroke-width="6" opacity="0.08"/>
+</svg>
