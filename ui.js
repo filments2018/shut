@@ -160,11 +160,26 @@ const UI = (() => {
     } else if (type === 'arrow') {
       cc.innerHTML = '<div class="arrow-guide">' + value + '</div>';
     } else if (type === 'shutter') {
-      var _dir = value || (window.State && window.State.mode ? window.State.mode.arrow : '→');
-      cc.innerHTML =
-        '<div class="whip-dir-arrow">' + _dir + '</div>' +
-        '<div class="shut-big">WHIP!</div>' +
-        '<div class="shut-sub">この方向に素早く振る</div>';
+      if (value === 'any') {
+        // WHIPモード: 4方向を全表示
+        cc.innerHTML =
+          '<div class="whip-any-arrows">' +
+            '<div class="whip-any-top">↑</div>' +
+            '<div class="whip-any-row">' +
+              '<span>←</span>' +
+              '<span class="whip-any-center">WHIP</span>' +
+              '<span>→</span>' +
+            '</div>' +
+            '<div class="whip-any-bot">↓</div>' +
+          '</div>' +
+          '<div class="shut-sub">好きな方向に素早く振る</div>';
+      } else {
+        var _dir = value || (window.State && window.State.mode ? window.State.mode.arrow : '→');
+        cc.innerHTML =
+          '<div class="whip-dir-arrow">' + _dir + '</div>' +
+          '<div class="shut-big">WHIP!</div>' +
+          '<div class="shut-sub">この方向に素早く振る</div>';
+      }
       _enterShutterMode();
     } else if (type === 'processing') {
       cc.innerHTML = '<div class="processing-dots"><span></span><span></span><span></span></div>';

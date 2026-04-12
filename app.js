@@ -93,6 +93,8 @@ const State = window.State = {
   scores:      [],    // 各クリップのタイミング評価 {grade, offset}
   combo:       0,     // 連続GOOD以上の数
   maxCombo:    0,
+  // 前クリップの振り方向（次クリップの入りに引き継ぐ）
+  lastWhipDir: null,  // '→' | '←' | '↑' | '↓'
 };
 
 function _T(fn, ms) {
@@ -108,6 +110,19 @@ function _T(fn, ms) {
 function _clearTimers() {
   State.timers.forEach(clearTimeout);
   State.timers = [];
+}
+
+// ── 振り方向検出（加速度から↑↓←→を判定） ────────
+function _detectWhipDir(accelDir) {
+  if (!accelDir || typeof accelDir !== 'object') return '→';
+  var ax = accelDir.x || 0;
+  var ay = accelDir.y || 0;
+  // 絶対値が大きい軸が振り方向
+  if (Math.abs(ax) >= Math.abs(ay)) {
+    return ax >= 0 ? '→' : '←';
+  } else {
+    return ay >= 0 ? '↑' : '↓';
+  }
 }
 
 // ── ハプティクスフィードバック ────────────────────
@@ -186,6 +201,7 @@ function gotoSelect() {
   State.scores     = [];
   State.combo      = 0;
   State.maxCombo   = 0;
+  State.lastWhipDir = null;
 
   Motion.setActive(false);
   Audio.stop();
@@ -466,6 +482,20 @@ function gotoRecording() {
     }
   }
 
+  // WHIPモード: 動的ガイド（前クリップの振り方向から入る）
+  if (m.id === 'whip') {
+    if (State.clips === 0) {
+      step = { guide: '被写体を正面に止めて映す', arrow: '•', hud: 'SCENE A  静止' };
+    } else {
+      var _enterDir = State.lastWhipDir || '→';
+      step = {
+        guide: _enterDir + ' から入り、被写体を止める',
+        arrow: _enterDir,
+        hud: _enterDir + ' IN → 静止',
+      };
+    }
+  }
+
   UI.setCenter('arrow', step && step.arrow ? step.arrow : m.arrow);
   // ガイドテキストに矢印を前置してわかりやすく
   var _guideArrow = (step && step.arrow && step.arrow !== '•') ? step.arrow + '  ' : '';
@@ -514,14 +544,21 @@ function gotoShutter() {
     Recorder.pauseClip();
   }
 
-  // 現在のレシピステップから振る方向を取得
-  var _shutStep  = _getRecipeStep(State.clips);
-  var _shutArrow = (_shutStep && _shutStep.arrow && _shutStep.arrow !== '•')
-    ? _shutStep.arrow
-    : (State.mode ? State.mode.arrow : '→');
-  UI.setCenter('shutter', _shutArrow);
-  UI.setGuideText(_shutArrow + '  この方向に素早く振る', false);
-  UI.setHudStatus('📳 &nbsp;<strong>' + _shutArrow + ' WHIP!</strong>');
+  // WHIPモード: 好きな方向に振れる（4方向表示）
+  // その他のモード: レシピ指定方向
+  if (State.mode && State.mode.id === 'whip') {
+    UI.setCenter('shutter', 'any');
+    UI.setGuideText('好きな方向に素早く振る', false);
+    UI.setHudStatus('📳 &nbsp;<strong>↑↓←→ WHIP!</strong>');
+  } else {
+    var _shutStep  = _getRecipeStep(State.clips);
+    var _shutArrow = (_shutStep && _shutStep.arrow && _shutStep.arrow !== '•')
+      ? _shutStep.arrow
+      : (State.mode ? State.mode.arrow : '→');
+    UI.setCenter('shutter', _shutArrow);
+    UI.setGuideText(_shutArrow + '  この方向に素早く振る', false);
+    UI.setHudStatus('📳 &nbsp;<strong>' + _shutArrow + ' WHIP!</strong>');
+  }
   UI.updateRemainingClips(CLIPS_NEEDED - State.clips, CLIPS_NEEDED);
   _vibrate(15);
 
@@ -572,7 +609,12 @@ function executeShut() {
   Audio.playShut();
   if (State.clips < CLIPS_NEEDED - 1) Audio.playTransition();
 
-  UI.addBlurSwipe(State.mode.color, Motion.getLastDirection());
+  // 振り方向を検出して次クリップの入りに引き継ぐ
+  var _whipAccel = Motion.getLastDirection();
+  var _detectedDir = _detectWhipDir(_whipAccel);
+  State.lastWhipDir = _detectedDir;
+
+  UI.addBlurSwipe(State.mode.color, _whipAccel);
   _T(() => UI.addFlash(grade), 30);
 
   // タイミング評価UI表示

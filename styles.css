@@ -1026,6 +1026,38 @@ button:focus-visible {
   45%       { transform: scale(1.12); text-shadow: 0 0 16px var(--c); }
   55%       { transform: scale(1.12); text-shadow: 0 0 16px var(--c); }
 }
+/* ── WHIP 4方向表示（シュット待機） ── */
+.whip-any-arrows {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  animation: shutAppear 0.25s cubic-bezier(.34,1.56,.64,1) both;
+}
+.whip-any-top,
+.whip-any-bot {
+  font-size: 44px; line-height: 1; color: var(--c);
+  text-shadow: 0 0 20px var(--c);
+  animation: whipAnyPulse 0.6s ease-in-out infinite;
+}
+.whip-any-bot { animation-delay: 0.3s; }
+.whip-any-row {
+  display: flex; align-items: center; gap: 14px;
+}
+.whip-any-row > span {
+  font-size: 44px; line-height: 1; color: var(--c);
+  text-shadow: 0 0 20px var(--c);
+  animation: whipAnyPulse 0.6s ease-in-out infinite;
+}
+.whip-any-row > span:last-child { animation-delay: 0.15s; }
+.whip-any-center {
+  font-family: var(--font-hd); font-size: 20px; font-weight: 900;
+  letter-spacing: 0.15em; color: #fff;
+  text-shadow: 0 0 16px var(--c);
+  animation: shutPulse 0.58s ease-in-out infinite;
+}
+@keyframes whipAnyPulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.22); }
+}
+
 /* 録画バー85%以上: WHIP READY 予告 */
 .arrow-guide.whip-ready {
   animation: whipReadyBlink 0.28s ease-in-out infinite !important;
