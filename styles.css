@@ -356,13 +356,26 @@ button:focus-visible {
   to   { transform: scale(1);   opacity: 1; }
 }
 .arrow-guide {
-  font-size: 52px; line-height: 1; color: var(--c);
+  font-size: 72px; line-height: 1; color: var(--c);
   will-change: transform, filter;
   animation: arrowBeat var(--beat-ms) ease-in-out infinite;
 }
 /* .arrow-guide.pulse はスタイル末尾で定義 */
+
+/* ── シュット待機: 大きな方向矢印 ── */
+.whip-dir-arrow {
+  font-size: 100px; line-height: 1; color: var(--c);
+  text-shadow: 0 0 30px var(--c), 0 0 60px rgba(var(--c-rgb), 0.4);
+  animation: whipDirPulse 0.55s ease-in-out infinite;
+  will-change: transform;
+}
+@keyframes whipDirPulse {
+  0%, 100% { transform: scale(1);    opacity: 0.85; }
+  50%       { transform: scale(1.22); opacity: 1; }
+}
+
 .shut-big {
-  font-family: var(--font-hd); font-size: 25px; font-weight: 900;
+  font-family: var(--font-hd); font-size: 34px; font-weight: 900;
   letter-spacing: 0.15em; color: var(--c);
   text-shadow: 0 0 18px var(--c);
   animation: shutAppear 0.25s cubic-bezier(.34,1.56,.64,1) both,
@@ -373,8 +386,8 @@ button:focus-visible {
   to   { transform: scale(1);   opacity: 1; letter-spacing: 0.15em; }
 }
 .shut-sub {
-  font-family: var(--font-ui); font-size: 9px; letter-spacing: 0.22em;
-  color: rgba(255,255,255,0.36);
+  font-family: var(--font-ui); font-size: 11px; letter-spacing: 0.18em;
+  color: rgba(255,255,255,0.55);
 }
 @keyframes shutPulse { 0%,100%{opacity:0.5;transform:scale(1)} 50%{opacity:1;transform:scale(1.09)} }
 
@@ -394,9 +407,9 @@ button:focus-visible {
 
 /* ガイドテキスト */
 .vf-guide-text {
-  font-family: var(--font-ui); font-size: 10px; letter-spacing: 0.22em;
-  color: rgba(255,255,255,0.42);
-  text-shadow: 0 1px 5px rgba(0,0,0,0.9); text-transform: uppercase;
+  font-family: var(--font-ui); font-size: 12px; letter-spacing: 0.18em;
+  color: rgba(255,255,255,0.72);
+  text-shadow: 0 1px 6px rgba(0,0,0,0.95); text-transform: uppercase;
   transition: opacity 0.3s ease, letter-spacing 0.3s ease;
 }
 
@@ -1013,6 +1026,21 @@ button:focus-visible {
   45%       { transform: scale(1.12); text-shadow: 0 0 16px var(--c); }
   55%       { transform: scale(1.12); text-shadow: 0 0 16px var(--c); }
 }
+/* 録画バー85%以上: WHIP READY 予告 */
+.arrow-guide.whip-ready {
+  animation: whipReadyBlink 0.28s ease-in-out infinite !important;
+  color: #fff;
+  text-shadow: 0 0 24px var(--c), 0 0 48px var(--c);
+}
+@keyframes whipReadyBlink {
+  0%, 100% { transform: scale(1);    opacity: 0.7; }
+  50%       { transform: scale(1.35); opacity: 1; }
+}
+.rec-bar-fill.whip-zone {
+  background: linear-gradient(90deg, var(--c), #fff) !important;
+  box-shadow: 0 0 12px var(--c);
+}
+
 /* beatPulse クラスで瞬時スパイク（アニメーション上書き） */
 .arrow-guide.pulse {
   animation: none;

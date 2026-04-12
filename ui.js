@@ -160,7 +160,11 @@ const UI = (() => {
     } else if (type === 'arrow') {
       cc.innerHTML = '<div class="arrow-guide">' + value + '</div>';
     } else if (type === 'shutter') {
-      cc.innerHTML = '<div class="shut-big">SHUT!</div><div class="shut-sub">スマホを振る</div>';
+      var _dir = value || (window.State && window.State.mode ? window.State.mode.arrow : '→');
+      cc.innerHTML =
+        '<div class="whip-dir-arrow">' + _dir + '</div>' +
+        '<div class="shut-big">WHIP!</div>' +
+        '<div class="shut-sub">この方向に素早く振る</div>';
       _enterShutterMode();
     } else if (type === 'processing') {
       cc.innerHTML = '<div class="processing-dots"><span></span><span></span><span></span></div>';
@@ -383,12 +387,27 @@ const UI = (() => {
 
     _recStart = performance.now();
     _recCb    = onComplete;
+    let _whipReady = false;
 
     const tick = now => {
       const p = Math.min((now - _recStart) / duration, 1);
       fill.style.width = (p * 100) + '%';
+
+      // 85%以上: WHIP READY 予告（矢印を大きく点滅）
+      const arrow = document.querySelector('.arrow-guide');
+      if (p >= 0.85 && !_whipReady) {
+        _whipReady = true;
+        if (arrow) arrow.classList.add('whip-ready');
+        fill.classList.add('whip-zone');
+      }
+
       if (p < 1) { _recRaf = requestAnimationFrame(tick); }
-      else       { _recRaf = null; if (_recCb) _recCb(); }
+      else {
+        _recRaf = null;
+        if (arrow) arrow.classList.remove('whip-ready');
+        fill.classList.remove('whip-zone');
+        if (_recCb) _recCb();
+      }
     };
     _recRaf = requestAnimationFrame(tick);
   }

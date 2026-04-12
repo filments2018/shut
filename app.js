@@ -20,10 +20,10 @@ const MODES = [
     recipeType: 'transition',
     recipeSummary: '素早いパンのブレでカットA/Bをつなぐ',
     steps: [
-      { guide: 'カットA。被写体を止めて見せる', arrow: '•', hud: 'A  被写体を見せる' },
-      { guide: '録画を止めずに右へ素早く振る', arrow: '→', hud: 'A OUT  右へ振る' },
-      { guide: 'カットB。右から左へ振りながら入る', arrow: '←', hud: 'B IN  逆側から入る' },
-      { guide: 'Bの被写体を捉えて止める', arrow: '•', hud: 'B  被写体で止める' },
+      { guide: '被写体を正面に向けてカメラを止める', arrow: '•', hud: 'SCENE A  静止' },
+      { guide: 'バーが埋まったら → に振る', arrow: '→', hud: '→ WHIP READY' },
+      { guide: '右から始めて次の被写体を捉える', arrow: '→', hud: '→ SCENE B  捉える' },
+      { guide: '被写体で止まる', arrow: '•', hud: 'SCENE B  静止' },
     ],
   },
   {
@@ -467,7 +467,9 @@ function gotoRecording() {
   }
 
   UI.setCenter('arrow', step && step.arrow ? step.arrow : m.arrow);
-  UI.setGuideText(step && step.guide ? step.guide : m.guide, false); // 通常輝度
+  // ガイドテキストに矢印を前置してわかりやすく
+  var _guideArrow = (step && step.arrow && step.arrow !== '•') ? step.arrow + '  ' : '';
+  UI.setGuideText(_guideArrow + (step && step.guide ? step.guide : m.guide), false);
   UI.markClipCurrent(State.clips);
   UI.showRecIndicator(State.clips + 1, CLIPS_NEEDED, m.bpm);
   UI.updateRemainingClips(CLIPS_NEEDED - State.clips, CLIPS_NEEDED);
@@ -512,9 +514,14 @@ function gotoShutter() {
     Recorder.pauseClip();
   }
 
-  UI.setCenter('shutter');
-  UI.setGuideText('', false);
-  UI.setHudStatus('📳 &nbsp;<strong>シュッ！と振る</strong>');
+  // 現在のレシピステップから振る方向を取得
+  var _shutStep  = _getRecipeStep(State.clips);
+  var _shutArrow = (_shutStep && _shutStep.arrow && _shutStep.arrow !== '•')
+    ? _shutStep.arrow
+    : (State.mode ? State.mode.arrow : '→');
+  UI.setCenter('shutter', _shutArrow);
+  UI.setGuideText(_shutArrow + '  この方向に素早く振る', false);
+  UI.setHudStatus('📳 &nbsp;<strong>' + _shutArrow + ' WHIP!</strong>');
   UI.updateRemainingClips(CLIPS_NEEDED - State.clips, CLIPS_NEEDED);
   _vibrate(15);
 

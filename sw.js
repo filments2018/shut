@@ -4,7 +4,7 @@
  *       → Promise.resolve(null) は respondWith に渡せない → フォールバック強化
  * 修正: キャッシュ名を v11 に更新
  */
-const CACHE  = 'shut-v30';
+const CACHE  = 'shut-v31';
 const ASSETS = [
   '/',
   '/index.html',
