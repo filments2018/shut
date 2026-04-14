@@ -473,12 +473,15 @@ function gotoRecording() {
   const dur = (60000 / m.bpm) * (m.beatsPerClip || 6);
   const step = _getRecipeStep(State.clips);
 
-  // 最初のクリップ開始時にREC枠フラッシュ
-  if (State.clips === 0) {
-    var vfMain = document.getElementById('vf-main');
-    if (vfMain) {
+  // クリップ開始時にREC枠フラッシュ（clips=0は白、clips>0は入り方向カラー）
+  var vfMain = document.getElementById('vf-main');
+  if (vfMain) {
+    if (State.clips === 0) {
       vfMain.classList.add('rec-flash');
       setTimeout(function() { vfMain.classList.remove('rec-flash'); }, 700);
+    } else {
+      vfMain.classList.add('enter-flash');
+      setTimeout(function() { vfMain.classList.remove('enter-flash'); }, 450);
     }
   }
 
@@ -548,7 +551,7 @@ function gotoShutter() {
   // その他のモード: レシピ指定方向
   if (State.mode && State.mode.id === 'whip') {
     UI.setCenter('shutter', 'any');
-    UI.setGuideText('好きな方向に素早く振る', false);
+    UI.setGuideText('', false);  // shut-sub と重複しないよう空にする
     UI.setHudStatus('📳 &nbsp;<strong>↑↓←→ WHIP!</strong>');
   } else {
     var _shutStep  = _getRecipeStep(State.clips);
@@ -628,7 +631,7 @@ function executeShut() {
   } else {
     // BPM に合わせた間隔（1拍分）でリズムを維持
     var beatMs = Math.round(60000 / (State.mode ? State.mode.bpm : 100));
-    var transMs = Math.min(beatMs, 550);
+    var transMs = Math.max(500, Math.min(beatMs, 600)); // blur-swipe完了(460ms)を確実に待つ
     // 次クリップ番号を一瞬だけ HUD に表示してリズムを保持
     UI.setHudStatus(
       '<span style="letter-spacing:0.2em;opacity:0.7">CLIP ' +
@@ -912,7 +915,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   on('btn-share', async () => {
     _vibrate(15);
-    const blob   = State._cachedBlob || null;
+    const blob = State._cachedBlob || null;
+    if (!blob) {
+      UI.showToast('録画データがありません。もう一度撮影してください。', 2500);
+      return;
+    }
     const result = await Share.shareOrDownload(blob, {
       label:    State.mode ? State.mode.label    : 'WHIP',
       bpm:      State.mode ? State.mode.bpm      : 85,

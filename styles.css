@@ -180,6 +180,23 @@ button:focus-visible {
   touch-action: manipulation;
   animation: modePulse var(--mode-bpm-ms, 706ms) ease-in-out infinite;
 }
+/* WHIPをヒーローカード（フル幅）にする */
+.mode-btn:first-child {
+  grid-column: 1 / -1;
+  min-height: 100px;
+  flex-direction: row;
+  justify-content: flex-start;
+  padding: 16px 20px;
+  gap: 16px;
+}
+.mode-btn:first-child .mode-emoji { font-size: 34px; }
+.mode-btn:first-child .mode-label { font-size: 22px; }
+.mode-hero-badge {
+  position: absolute; top: 8px; right: 10px;
+  font-family: var(--font-ui); font-size: 8px; letter-spacing: 0.18em;
+  color: var(--mode-color); opacity: 0.7;
+  text-transform: uppercase;
+}
 .mode-btn::after {
   content: '';
   position: absolute; inset: 0;
@@ -361,6 +378,12 @@ button:focus-visible {
   animation: arrowBeat var(--beat-ms) ease-in-out infinite;
 }
 /* .arrow-guide.pulse はスタイル末尾で定義 */
+/* 静止中（•）は animation なし */
+.arrow-guide.arrow-still {
+  animation: none;
+  font-size: 48px;
+  opacity: 0.5;
+}
 
 /* ── シュット待機: 大きな方向矢印 ── */
 .whip-dir-arrow {
@@ -448,10 +471,18 @@ button:focus-visible {
   position: absolute; inset: 0; z-index: 78; pointer-events: none;
   animation: swipeFade 0.4s ease-out forwards;
 }
+.blur-swipe.vertical {
+  animation: swipeFadeV 0.4s ease-out forwards;
+}
 @keyframes swipeFade {
   0%   { opacity:0; transform:scaleX(0.1); transform-origin:left; }
   45%  { opacity:1; transform:scaleX(1); }
   100% { opacity:0; transform:scaleX(1); }
+}
+@keyframes swipeFadeV {
+  0%   { opacity:0; transform:scaleY(0.1); transform-origin:top; }
+  45%  { opacity:1; transform:scaleY(1); }
+  100% { opacity:0; transform:scaleY(1); }
 }
 
 /* スキャンライン */
@@ -626,8 +657,18 @@ button:focus-visible {
   box-shadow: 0 4px 24px rgba(var(--c-rgb), 0.4);
   transition: transform 0.14s ease, box-shadow 0.14s ease;
   min-width: 120px;
+  animation: shareAppear 0.5s cubic-bezier(.34,1.56,.64,1) 0.8s both,
+             sharePulse 2.5s ease-in-out 1.4s infinite;
 }
-.btn-share:active { transform: scale(0.95); }
+.btn-share:active { transform: scale(0.95); animation: none; }
+@keyframes shareAppear {
+  from { transform: scale(0.7); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+@keyframes sharePulse {
+  0%, 100% { box-shadow: 0 4px 24px rgba(var(--c-rgb), 0.4); }
+  50%       { box-shadow: 0 4px 40px rgba(var(--c-rgb), 0.75), 0 0 0 6px rgba(var(--c-rgb), 0.12); }
+}
 .btn-download {
   padding: 12px 16px; border-radius: 50px;
   background: rgba(var(--c-rgb), 0.1);
@@ -714,6 +755,13 @@ button:focus-visible {
   font-size: 9px; letter-spacing: 0.42em;
   color: rgba(255,255,255,0.3);
   animation: splashFadeIn 0.8s ease-out 0.3s both;
+}
+.splash-tagline {
+  font-family: var(--font-ui);
+  font-size: 10px; letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.45);
+  text-align: center;
+  animation: splashFadeIn 0.8s ease-out 0.5s both;
 }
 .splash-ring {
   position: absolute;
@@ -1007,11 +1055,11 @@ button:focus-visible {
    ============================================ */
 .shutter-timeout-bar {
   position: absolute;
-  bottom: -3px; left: 0;
-  height: 2px;
+  bottom: 0; left: 0;
+  height: 5px;
   width: 100%;
   background: var(--c);
-  box-shadow: 0 0 6px var(--c);
+  box-shadow: 0 0 8px var(--c), 0 0 16px rgba(var(--c-rgb), 0.5);
   border-radius: 0 0 2px 2px;
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -1534,6 +1582,14 @@ button:focus-visible {
   font-family: var(--font-ui); font-size: 11px;
   color: rgba(255,255,255,0.55); line-height: 1.9; max-width: 260px;
 }
+.tut-tip {
+  display: inline-block; margin-top: 6px;
+  padding: 5px 10px; border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  font-size: 10px; color: rgba(255,255,255,0.45);
+  letter-spacing: 0.04em;
+}
 .tut-arrow-anim {
   color: var(--c);
   animation: tutArrow 1.2s ease-in-out infinite;
@@ -1742,6 +1798,16 @@ button:focus-visible {
 @keyframes recBorderFlash {
   0%   { box-shadow: inset 0 0 0 3px rgba(255,53,53,0.6); }
   100% { box-shadow: inset 0 0 0 3px transparent; }
+}
+/* カット入り（enter-flash）: シアンの枠フラッシュ */
+.vf-main.enter-flash::before {
+  content: ''; position: absolute; inset: 0; z-index: 86;
+  pointer-events: none;
+  animation: enterFlashAnim 0.45s ease-out forwards;
+}
+@keyframes enterFlashAnim {
+  0%   { box-shadow: inset 0 0 0 4px rgba(var(--c-rgb), 0.9), inset 0 0 30px rgba(var(--c-rgb), 0.3); }
+  100% { box-shadow: inset 0 0 0 4px transparent, inset 0 0 0px transparent; }
 }
 
 /* ============================================

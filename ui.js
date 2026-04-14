@@ -158,7 +158,12 @@ const UI = (() => {
         '<div class="countdown-bg-arrow" aria-hidden="true">' + goArrow + '</div>' +
         '<div class="go-text">GO!</div>';
     } else if (type === 'arrow') {
-      cc.innerHTML = '<div class="arrow-guide">' + value + '</div>';
+      // '•' は静止表示（ビートアニメーションで「振れ」の誤解を防ぐ）
+      if (value === '•') {
+        cc.innerHTML = '<div class="arrow-guide arrow-still">•</div>';
+      } else {
+        cc.innerHTML = '<div class="arrow-guide">' + value + '</div>';
+      }
     } else if (type === 'shutter') {
       if (value === 'any') {
         // WHIPモード: 4方向を全表示
@@ -530,6 +535,10 @@ const UI = (() => {
 
     el.style.background =
       'linear-gradient(' + angle + ',transparent 0%,rgba(0,0,0,0.6) 25%,rgba(0,0,0,0.85) 55%,' + color + ' 100%)';
+    // 上下振り時はアニメーションを縦方向に切替
+    if (dir && Math.abs(dir.y || 0) > Math.abs(dir.x || 0) * 1.2) {
+      el.classList.add('vertical');
+    }
     main.appendChild(el);
     _pulseTimeout(() => { if (el.parentNode) el.remove(); }, 460);
   }
@@ -643,12 +652,12 @@ const UI = (() => {
     vid.setAttribute('x-webkit-airplay', 'deny');
     vid.setAttribute('disablePictureInPicture', '');
     vid.controls   = true;
-    vid.loop       = false; // 動画は1回再生のみ（ループしない）
-    vid.muted      = false;  // 音ありで再生
+    vid.loop       = true;  // ループ再生（完成確認しやすくする）
+    vid.muted      = true;  // iOS autoplay はミュート必須
     vid.style.cssText =
-      'width:100%;max-width:260px;border-radius:10px;display:block;' +
-      'border:1.5px solid ' + mode.color + ';' +
-      'box-shadow:0 0 14px ' + mode.color + '55;background:#000;';
+      'width:100%;max-width:320px;border-radius:12px;display:block;' +
+      'border:2px solid ' + mode.color + ';' +
+      'box-shadow:0 0 20px ' + mode.color + '66;background:#000;';
 
     // ObjectURL を作成して追跡
     _previewBlobUrl = URL.createObjectURL(blob);
@@ -1101,14 +1110,21 @@ const UI = (() => {
         ? '<span class="mode-last-badge" style="color:' + m.color +
           ';background:' + m.color + '22;border-color:' + m.color + '55">▶ 前回</span>'
         : '';
+      var isFirst = modes.indexOf(m) === 0;
+      var heroBadge = isFirst
+        ? '<span class="mode-hero-badge" style="color:' + m.color + ';background:' + m.color + '18;border-color:' + m.color + '44">まずはこれ</span>'
+        : '';
+      // recipeType を日本語に変換
+      var recipeTypeJa = { transition: 'つなぎ系', action: 'アクション系', foreground: '前景遮蔽系' };
+      var recipeLabel = recipeTypeJa[m.recipeType] || m.recipeType.toUpperCase();
       btn.innerHTML =
+        heroBadge +
         '<span class="mode-emoji">'   + m.emoji + '</span>' +
         '<span class="mode-label" style="color:' + m.color + '">' + m.label + '</span>' +
         lastBadgeHtml +
-        '<span class="mode-bpm">' + (m.recipeType || 'recipe').toUpperCase() + '</span>' +
+        '<span class="mode-bpm">' + recipeLabel + '</span>' +
         '<span class="mode-duration">約' + totalSec + '秒 / ' + (clips || 4) + 'カット</span>' +
-        '<span class="mode-guide-preview">' + (m.recipeSummary || m.guide) + '</span>' +
-        '<span class="mode-guide-preview">' + m.guide + '</span>';
+        '<span class="mode-guide-preview">' + (m.recipeSummary || m.guide) + '</span>';
       if (isLast) {
         btn.style.borderColor = m.color;
         btn.style.boxShadow   = '0 0 14px ' + m.color + '44';
