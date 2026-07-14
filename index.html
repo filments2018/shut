@@ -183,6 +183,12 @@
       <video id="cam" autoplay playsinline muted></video>
       <div class="vf-gradient"></div>
 
+      <!-- MATCH: シーンAの終端をシーンBの構図合わせに重ねる -->
+      <div class="match-guide" id="match-guide" role="img" aria-label="シーンAの構図ガイド" aria-hidden="true">
+        <canvas id="match-guide-canvas"></canvas>
+        <div class="match-guide-label">SCENE A FRAME</div>
+      </div>
+
       <!-- シーン間の準備オーバーレイ -->
       <div class="shot-prepare-overlay" id="shot-prepare-overlay" aria-hidden="true">
         <div class="shot-prepare-panel" role="dialog" aria-modal="true" aria-labelledby="shot-prepare-title">

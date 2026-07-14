@@ -1,8 +1,8 @@
 /**
- * sw.js — v40
- * iPhone向け録画確定待機と保存失敗UIの最終版を配信するためキャッシュ更新。
+ * sw.js — v41
+ * MATCH構図ゴーストを配信するためキャッシュ更新。
  */
-const CACHE  = 'shut-v40';
+const CACHE  = 'shut-v41';
 const ASSETS = [
   '/',
   '/index.html',

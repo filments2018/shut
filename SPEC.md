@@ -1,6 +1,6 @@
 # SHUT — スマホ撮影レシピ 仕様書
 
-> Version: v40 | Updated: 2026-07-15
+> Version: v41 | Updated: 2026-07-15
 
 ---
 
@@ -233,6 +233,8 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 - `buildCompleteScreen()` → スコアパネル、タイミングチャート、パーティクル
 - `beatPulse()` → ビートリング・矢印・録画バーマーカーの同期アニメーション
 - `showGradePopup()` → PERFECT/GOOD/OK/MISS のフローティング評価表示
+- MATCHではシーンAのタップ瞬間をCanvasへ保持し、シーンB準備・カウントダウン中に半透明の構図ゴーストとして表示
+- 構図ゴーストは画面表示のみで、MediaRecorderの完成動画には合成しない
 
 ---
 
@@ -245,7 +247,7 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 
 ### Service Worker (sw.js)
 - 戦略: Stale-While-Revalidate
-- キャッシュ名: `shut-v40`（手動バージョニング）
+- キャッシュ名: `shut-v41`（手動バージョニング）
 - `e.waitUntil(fetchPromise)` でバックグラウンド更新を保護
 - オフラインフォールバック: `index.html`
 

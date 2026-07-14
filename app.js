@@ -258,6 +258,7 @@ function gotoSelect() {
   UI.hideDummyBackground();
   UI.hideFlipBtn();
   UI.hidePrepareNext();
+  UI.clearMatchGuide();
   UI.cleanupPreview();
   UI.stopParticles();
   if (typeof UI.clearPulseTimers === 'function') UI.clearPulseTimers();
@@ -404,6 +405,7 @@ async function startMode(mode) {
   UI.hideRecIndicator();
   UI.hideDummyBackground();
   UI.hidePrepareNext();
+  UI.clearMatchGuide();
   UI.showScreen('camera');
   _checkOrientation();
 
@@ -476,6 +478,7 @@ function gotoCountdown() {
   UI.hideRecIndicator();
   UI.setHudStatus('<span style="letter-spacing:0.2em;opacity:0.6">READY</span>');
   UI.updateRemainingClips(CLIPS_NEEDED - State.clips, CLIPS_NEEDED);
+  UI.showMatchGuide(State.mode && State.mode.id === 'match' && State.clips > 0);
 
   // カウントダウン間隔をBPMに合わせる（1拍分）
   var countBeat = Math.round(60000 / (State.mode ? State.mode.bpm : 100));
@@ -512,6 +515,7 @@ function gotoRecording() {
   _clearTimers();
   State.phase = 'recording';
   Motion.setActive(false);
+  UI.showMatchGuide(false);
   _checkOrientation();
 
   const m   = State.mode;
@@ -606,6 +610,7 @@ function gotoShutter() {
     UI.showGradePopup('MISS', 0);
     Audio.playWarning();
     _vibrate([20, 20, 20]);
+    _captureMatchGuide();
     if (State.recEnabled && Recorder.isRecording()) Recorder.pauseClip();
     UI.markClipDone(State.clips);
     State.clips++;
@@ -619,6 +624,7 @@ function executeShut() {
   State.phase = 'executing';
   Motion.setActive(false);
   UI.cancelShutterCountdown();
+  _captureMatchGuide();
 
   // ── タイミング評価 ──────────────────────────────
   const offset = Audio.getTimingOffset(); // ビートとのズレ(ms)
@@ -678,6 +684,12 @@ function _getTransition() {
   };
 }
 
+function _captureMatchGuide() {
+  if (!State.mode || State.mode.id !== 'match' || State.clips !== 0) return false;
+  const video = document.getElementById('cam');
+  return UI.captureMatchGuide(video, !Camera.isRear());
+}
+
 function _getShotStep(index) {
   if (!State.mode) return null;
   var shots = State.mode.shots && State.mode.shots.length
@@ -701,6 +713,7 @@ function gotoPrepareNext() {
   State.phase = 'prepare';
   Motion.setActive(false);
   Audio.stop();
+  UI.dismissGradePopup();
   UI.stopRecBar();
   UI.hideRecIndicator();
   UI.setCenter('empty');
@@ -716,7 +729,9 @@ function gotoPrepareNext() {
     title: '次のシーンを準備',
     description: direction + transition.prepare,
     ready: transition.ready,
+    matchGuide: State.mode && State.mode.id === 'match' && UI.hasMatchGuide(),
   });
+  UI.showMatchGuide(State.mode && State.mode.id === 'match');
 }
 
 function startNextScene() {
@@ -784,6 +799,7 @@ async function gotoComplete() {
   State.phase = 'complete';
   Motion.setActive(false);
   UI.hidePrepareNext();
+  UI.clearMatchGuide();
   Audio.stop();  // 完成後は freeze 状態も含めてリセット
   UI.hideFlipBtn();
   UI.updateRemainingClips(0, CLIPS_NEEDED);

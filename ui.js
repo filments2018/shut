@@ -251,6 +251,7 @@ const UI = (() => {
     if (title) title.textContent = data.title || '次のシーンを準備';
     if (desc) desc.textContent = data.description || '';
     if (ready) ready.textContent = data.ready || '';
+    overlay.classList.toggle('with-match-guide', !!data.matchGuide);
     overlay.classList.add('show');
     overlay.setAttribute('aria-hidden', 'false');
     const btn = $('btn-next-scene');
@@ -261,8 +262,81 @@ const UI = (() => {
     const overlay = $('shot-prepare-overlay');
     if (!overlay) return;
     overlay.classList.remove('show');
+    overlay.classList.remove('with-match-guide');
     overlay.setAttribute('aria-hidden', 'true');
   }
+
+  // ── MATCH 構図ゴースト ─────────────────────────
+  let _hasMatchGuide = false;
+
+  function captureMatchGuide(video, mirrored) {
+    const wrap = $('match-guide');
+    const canvas = $('match-guide-canvas');
+    const stage = $('vf-main');
+    if (!wrap || !canvas || !stage || !video || !video.videoWidth || !video.videoHeight) {
+      _hasMatchGuide = false;
+      return false;
+    }
+
+    const width = stage.clientWidth || window.innerWidth;
+    const height = stage.clientHeight || window.innerHeight;
+    if (!width || !height) return false;
+
+    // 表示用ガイドなので端末負荷を抑えつつRetinaでも輪郭が見える密度に制限する。
+    const density = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(width * density);
+    canvas.height = Math.round(height * density);
+
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) return false;
+    ctx.setTransform(density, 0, 0, density, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    // videoのobject-fit: coverと同じ拡大・中央クロップで描画する。
+    const scale = Math.max(width / video.videoWidth, height / video.videoHeight);
+    const drawWidth = video.videoWidth * scale;
+    const drawHeight = video.videoHeight * scale;
+    const dx = (width - drawWidth) / 2;
+    const dy = (height - drawHeight) / 2;
+
+    ctx.save();
+    if (mirrored) {
+      ctx.translate(width, 0);
+      ctx.scale(-1, 1);
+    }
+    try {
+      ctx.drawImage(video, dx, dy, drawWidth, drawHeight);
+    } catch (_) {
+      ctx.restore();
+      _hasMatchGuide = false;
+      return false;
+    }
+    ctx.restore();
+    _hasMatchGuide = true;
+    return true;
+  }
+
+  function showMatchGuide(show) {
+    const wrap = $('match-guide');
+    if (!wrap) return false;
+    const visible = !!show && _hasMatchGuide;
+    wrap.classList.toggle('show', visible);
+    wrap.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    return visible;
+  }
+
+  function clearMatchGuide() {
+    showMatchGuide(false);
+    const canvas = $('match-guide-canvas');
+    if (canvas) {
+      // 大きなCanvasバッファを即時解放してiPhoneのメモリを戻す。
+      canvas.width = 1;
+      canvas.height = 1;
+    }
+    _hasMatchGuide = false;
+  }
+
+  function hasMatchGuide() { return _hasMatchGuide; }
 
   // HUD ステータス（opacity フェードイン、競合防止）
   let _hudFadeTimer = null;
@@ -556,6 +630,12 @@ const UI = (() => {
     // 表示時間: PERFECT/GOOD は長め
     var dur = (grade === 'PERFECT' || grade === 'GOOD') ? 1100 : 850;
     _pulseTimeout(function() { if (el.parentNode) el.remove(); }, dur);
+  }
+
+  function dismissGradePopup() {
+    const main = $('vf-main');
+    if (!main) return;
+    main.querySelectorAll('.grade-popup').forEach(function(el) { el.remove(); });
   }
 
   function addBlurSwipe(color, dir) {
@@ -1235,11 +1315,12 @@ const UI = (() => {
     showFlipBtn, hideFlipBtn,
     setCenter, setGuideText, setHudStatus,
     showPrepareNext, hidePrepareNext,
+    captureMatchGuide, showMatchGuide, clearMatchGuide, hasMatchGuide,
     beatPulse, stopViz, updateVizBpm,
     startShutterCountdown, cancelShutterCountdown,
     clearPulseTimers: _clearPulseTimers,
     startRecBar, stopRecBar,
-    addFlash, addBlurSwipe, showGradePopup,
+    addFlash, addBlurSwipe, showGradePopup, dismissGradePopup,
     showCamPreviewHint, showDummyBackground, hideDummyBackground,
     showRecIndicator, hideRecIndicator,
     updateMotionGauge,
