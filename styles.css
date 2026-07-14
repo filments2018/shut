@@ -354,7 +354,10 @@ html, body {
 /* ============================================
    2. モード選択（クリーム）
    ============================================ */
-#screen-select { gap: 22px; padding: 32px 20px; background: var(--color-paper); }
+#screen-select {
+  justify-content: flex-start; gap: 16px; padding: 32px 20px;
+  background: var(--color-paper); overflow-y: auto;
+}
 .select-header { text-align: center; }
 .select-logo {
   font-family: var(--font-hd); font-size: 66px; font-weight: 800;
@@ -411,6 +414,37 @@ html, body {
   animation: vizFlash 0.15s ease-out forwards;
 }
 @keyframes vizFlash { from { opacity: 1; } to { opacity: 0; } }
+
+/* シーン間を自動で進めるか、移動のため待機するかを選ぶ操作面 */
+.shoot-flow-selector { width: 100%; max-width: 380px; }
+.shoot-flow-title {
+  margin-bottom: 7px;
+  font-family: var(--font-label); font-size: 10px; font-weight: 700;
+  color: rgba(var(--color-ink-rgb), 0.58); text-align: center;
+}
+.shoot-flow-options {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px; padding: 5px;
+  border: 1px solid rgba(var(--color-ink-rgb), 0.14); border-radius: 8px;
+  background: var(--color-paper-2);
+}
+.shoot-flow-btn {
+  min-width: 0; min-height: 58px; padding: 9px 8px;
+  border: 1px solid transparent; border-radius: 6px;
+  background: transparent; color: rgba(var(--color-ink-rgb), 0.66);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  cursor: pointer;
+}
+.shoot-flow-btn.active {
+  border-color: rgba(var(--color-ink-rgb), 0.16);
+  background: var(--color-paper); color: var(--color-ink);
+  box-shadow: var(--shadow-soft);
+}
+.shoot-flow-name { font-family: var(--font-hd); font-size: 13px; font-weight: 800; }
+.shoot-flow-desc {
+  max-width: 100%; font-family: var(--font-ui); font-size: 10px; font-weight: 500;
+  line-height: 1.35; text-align: center;
+}
 
 /* モードカード — カラーシフトカード */
 .modes {
@@ -599,6 +633,12 @@ html, body {
   font-family: var(--font-label); font-size: 10px; font-weight: 500;
   letter-spacing: 0.12em; color: var(--c); margin-bottom: 10px;
 }
+.shot-prepare-flow {
+  display: inline-flex; margin-bottom: 10px; padding: 4px 7px;
+  border: 1px solid rgba(var(--c-rgb), 0.26); border-radius: 5px;
+  background: rgba(var(--c-rgb), 0.08); color: var(--c);
+  font-family: var(--font-label); font-size: 9px; font-weight: 700;
+}
 .shot-prepare-title {
   font-family: var(--font-hd); font-size: 23px; font-weight: 800;
   letter-spacing: 0; margin-bottom: 14px;
@@ -614,6 +654,13 @@ html, body {
   font-family: var(--font-ui); font-size: 12px; font-weight: 700;
   line-height: 1.65; text-align: left;
 }
+.shot-prepare-overlay.continuous-mode .shot-prepare-ready::after {
+  content: ''; display: block; height: 3px; margin-top: 8px;
+  border-radius: 3px; background: var(--c);
+  transform-origin: left center;
+  animation: continuousResume var(--resume-ms, 2200ms) linear forwards;
+}
+@keyframes continuousResume { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .shot-prepare-start { width: 100%; border-radius: 8px; }
 .shot-prepare-cancel {
   margin-top: 12px; padding: 8px 18px;

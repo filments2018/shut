@@ -120,6 +120,7 @@ const MODES = [
 // デバッグ時のみ URL?clips=4/6 で連続シーン数を増やせる。
 let CLIPS_NEEDED = 2;
 let _coverDetectTimer = null;
+const CONTINUOUS_RESUME_MS = 2200;
 
 // グローバル公開（ui.js の window.State 参照で使用）
 window.State = null;
@@ -131,6 +132,7 @@ const State = window.State = {
   timers:      [],
   debugTaps:   0,
   sensitivity: 22,
+  shootFlow:   'travel', // 'continuous' | 'travel'
   // スコアシステム
   scores:      [],    // 各クリップのタイミング評価 {grade, offset}
   combo:       0,     // 連続GOOD以上の数
@@ -391,6 +393,23 @@ function _showBpmPicker(baseMode) {
 /** 最後に使ったモードIDを取得 */
 function _getLastModeId() {
   try { return localStorage.getItem('shut_last_mode'); } catch (_) { return null; }
+}
+
+function _getSavedShootFlow() {
+  try {
+    return localStorage.getItem('shut_shoot_flow') === 'continuous' ? 'continuous' : 'travel';
+  } catch (_) {
+    return 'travel';
+  }
+}
+
+function _setShootFlow(flow, persist) {
+  if (flow !== 'continuous' && flow !== 'travel') return;
+  State.shootFlow = flow;
+  UI.setShootFlow(flow);
+  if (persist !== false) {
+    try { localStorage.setItem('shut_shoot_flow', flow); } catch (_) {}
+  }
 }
 
 async function startMode(mode) {
@@ -788,15 +807,31 @@ function gotoPrepareNext() {
   var direction = State.mode && State.mode.id === 'whip'
     ? (State.lastWhipDir || '→') + '方向をそろえる。'
     : '';
+  var isContinuous = State.shootFlow === 'continuous';
+  var nextShot = _getShotStep(State.clips);
+  var description = isContinuous && nextShot
+    ? direction + nextShot.guide
+    : direction + transition.prepare;
   UI.showPrepareNext({
     scene: State.clips + 1,
     total: CLIPS_NEEDED,
-    title: '次のシーンを準備',
-    description: direction + transition.prepare,
-    ready: transition.ready,
+    title: isContinuous ? 'そのまま次のシーンへ' : '移動して次のシーンを準備',
+    description: description,
+    ready: isContinuous
+      ? 'まもなく自動でカウントダウンを開始します。'
+      : transition.ready,
+    flowLabel: isContinuous ? 'CONTINUOUS' : 'MOVE & RESUME',
+    buttonLabel: isContinuous ? '今すぐ再開' : '準備できたら撮影再開',
+    autoResume: isContinuous,
+    resumeMs: CONTINUOUS_RESUME_MS,
     matchGuide: State.mode && State.mode.id === 'match' && UI.hasMatchGuide(),
   });
   UI.showMatchGuide(State.mode && State.mode.id === 'match');
+  if (isContinuous) {
+    _T(() => {
+      if (!document.hidden) startNextScene();
+    }, CONTINUOUS_RESUME_MS);
+  }
 }
 
 function startNextScene() {
@@ -1069,6 +1104,7 @@ function _dbgUpdate(mag) {
 document.addEventListener('DOMContentLoaded', () => {
   // URLパラメータを先に処理
   const urlMode = _urlMode();
+  _setShootFlow(_getSavedShootFlow(), false);
   _checkOrientation();
 
   // スプラッシュ → 次画面への遷移
@@ -1106,6 +1142,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+
+  document.querySelectorAll('[data-shoot-flow]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _setShootFlow(btn.dataset.shootFlow, true);
+      _vibrate(10);
+    });
+  });
 
   on('btn-next-scene', startNextScene);
   on('btn-cancel-shoot', () => {

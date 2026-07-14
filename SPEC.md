@@ -1,6 +1,6 @@
 # SHUT — スマホ撮影レシピ 仕様書
 
-> Version: v42 | Updated: 2026-07-15
+> Version: v43 | Updated: 2026-07-15
 
 ---
 
@@ -10,6 +10,7 @@
 
 ### コアコンセプト
 - **レシピ選択 → シーンA → トランジション → シーンB** の撮影フロー
+- 同じ場所で自動再開する「連続撮影」と、移動後に任意で再開する「移動撮影」を選択可能
 - シーン間の移動・着替え・構図準備は完成動画から自動で除外
 - BPM（テンポ）に合わせたビートガイドでリズミカルに撮影
 - 加速度センサーまたは画面タップでトランジション動作を確定
@@ -86,6 +87,15 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 | `prepare` | 録画を一時停止し、場所・衣装・構図を準備 | `countdown` |
 | `complete` | 完成画面（スコア・プレビュー・シェア） | `select`（リトライ） |
 
+### 撮影スタイル
+
+| スタイル | シーン間の動作 | 用途 |
+|----------|----------------|------|
+| `continuous` | 準備画面を2.2秒表示した後、自動でカウントダウンを開始。「今すぐ再開」も可能 | 同じ場所でテンポよく連続撮影 |
+| `travel` | 録画を一時停止したまま無期限待機。「準備できたら撮影再開」でカウントダウンを開始 | 場所・衣装・構図を変える撮影 |
+
+選択値は `localStorage` の `shut_shoot_flow` に保存し、次回起動時にも引き継ぐ。初期値は `travel`。
+
 ---
 
 ## 5. 撮影レシピ（モード）
@@ -151,6 +161,7 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
   mode: null,            // 選択中のレシピ
   clips: 0,              // 撮影済みシーン数
   recEnabled: false,     // MediaRecorder が有効か
+  shootFlow: 'travel',   // 'continuous' | 'travel'
   scores: [],            // 各トランジションの {grade, offset}
   combo: 0,              // 連続 GOOD 以上
   maxCombo: 0,           // 最大コンボ

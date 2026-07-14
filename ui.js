@@ -240,21 +240,34 @@ const UI = (() => {
   }
 
   // ── シーン間準備 ───────────────────────────────
+  function setShootFlow(flow) {
+    document.querySelectorAll('[data-shoot-flow]').forEach(btn => {
+      const active = btn.dataset.shootFlow === flow;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+
   function showPrepareNext(data) {
     const overlay = $('shot-prepare-overlay');
     if (!overlay) return;
     const kicker = $('shot-prepare-kicker');
     const title = $('shot-prepare-title');
+    const flow = $('shot-prepare-flow');
     const desc = $('shot-prepare-desc');
     const ready = $('shot-prepare-ready');
     if (kicker) kicker.textContent = 'SCENE ' + data.scene + ' / ' + data.total;
     if (title) title.textContent = data.title || '次のシーンを準備';
+    if (flow) flow.textContent = data.flowLabel || 'MOVE & RESUME';
     if (desc) desc.textContent = data.description || '';
     if (ready) ready.textContent = data.ready || '';
+    const btn = $('btn-next-scene');
+    if (btn) btn.textContent = data.buttonLabel || 'START SCENE';
+    overlay.classList.toggle('continuous-mode', !!data.autoResume);
+    overlay.style.setProperty('--resume-ms', (data.resumeMs || 2200) + 'ms');
     overlay.classList.toggle('with-match-guide', !!data.matchGuide);
     overlay.classList.add('show');
     overlay.setAttribute('aria-hidden', 'false');
-    const btn = $('btn-next-scene');
     if (btn) requestAnimationFrame(() => btn.focus({ preventScroll: true }));
   }
 
@@ -263,6 +276,7 @@ const UI = (() => {
     if (!overlay) return;
     overlay.classList.remove('show');
     overlay.classList.remove('with-match-guide');
+    overlay.classList.remove('continuous-mode');
     overlay.setAttribute('aria-hidden', 'true');
   }
 
@@ -1336,7 +1350,7 @@ const UI = (() => {
     updateRemainingClips,
     showFlipBtn, hideFlipBtn,
     setCenter, setGuideText, setHudStatus,
-    showPrepareNext, hidePrepareNext,
+    setShootFlow, showPrepareNext, hidePrepareNext,
     captureMatchGuide, showMatchGuide, clearMatchGuide, hasMatchGuide,
     beatPulse, stopViz, updateVizBpm,
     startShutterCountdown, cancelShutterCountdown,

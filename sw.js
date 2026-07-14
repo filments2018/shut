@@ -1,8 +1,8 @@
 /**
- * sw.js — v42
- * COVER自動暗転判定を配信するためキャッシュ更新。
+ * sw.js — v43
+ * 連続撮影と移動撮影の切替を配信するためキャッシュ更新。
  */
-const CACHE  = 'shut-v42';
+const CACHE  = 'shut-v43';
 const ASSETS = [
   '/',
   '/index.html',

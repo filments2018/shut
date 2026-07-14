@@ -139,6 +139,19 @@
     <div class="bgm-indicator" id="bgm-indicator" style="display:none"></div>
   </div>
   <div class="bpm-visualizer" id="bpm-visualizer"></div>
+  <section class="shoot-flow-selector" aria-labelledby="shoot-flow-title">
+    <div class="shoot-flow-title" id="shoot-flow-title">撮影スタイル</div>
+    <div class="shoot-flow-options" role="group" aria-label="撮影スタイルを選択">
+      <button type="button" class="shoot-flow-btn" data-shoot-flow="continuous" aria-pressed="false">
+        <span class="shoot-flow-name">連続撮影</span>
+        <span class="shoot-flow-desc">同じ場所でテンポよく</span>
+      </button>
+      <button type="button" class="shoot-flow-btn" data-shoot-flow="travel" aria-pressed="true">
+        <span class="shoot-flow-name">移動撮影</span>
+        <span class="shoot-flow-desc">場所を変えて任意に再開</span>
+      </button>
+    </div>
+  </section>
   <div class="modes" id="mode-list"></div>
   <div class="how-to-box">
     撮影前に被写体を長押しして <strong>AE/AFロック</strong><br>
@@ -193,6 +206,7 @@
       <div class="shot-prepare-overlay" id="shot-prepare-overlay" aria-hidden="true">
         <div class="shot-prepare-panel" role="dialog" aria-modal="true" aria-labelledby="shot-prepare-title">
           <div class="shot-prepare-kicker" id="shot-prepare-kicker">SCENE 2 / 2</div>
+          <div class="shot-prepare-flow" id="shot-prepare-flow">MOVE &amp; RESUME</div>
           <div class="shot-prepare-title" id="shot-prepare-title">次のシーンを準備</div>
           <div class="shot-prepare-desc" id="shot-prepare-desc"></div>
           <div class="shot-prepare-ready" id="shot-prepare-ready"></div>
