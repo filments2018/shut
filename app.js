@@ -790,21 +790,29 @@ async function gotoComplete() {
   _checkOrientation();
 
   // 映像トラックを止める前に、1本の連続録画を確定して最終チャンクを受け取る。
+  let stopResult = { ok: true, size: 0, reason: null };
   if (State.recEnabled && (Recorder.isRecording() || Recorder.isPaused())) {
     UI.setHudStatus('<span class="processing-hud">● 保存中...</span>');
-    const saveTimeout = new Promise(res => setTimeout(res, 5000));
-    await Promise.race([Recorder.stopClip(), saveTimeout]);
+    stopResult = await Recorder.stopClip();
   }
   Camera.stop();
 
-  Audio.playComplete();
-  _vibrate([40, 20, 40, 20, 80]);
-
   // 録画データを取得しキャッシュ（btn-share でも再利用）
   const _finalBlob = State.recEnabled ? Recorder.getFinalBlob() : null;
+  const _saveFailed = State.recEnabled && (!stopResult.ok || !_finalBlob || _finalBlob.size === 0);
   State._cachedBlob = _finalBlob;
   const _shootTime  = new Date();
-  const _scoreTitle = _calcTitle(State.scores);
+  const _scoreTitle = _saveFailed
+    ? { title: '保存できませんでした', stars: 0 }
+    : _calcTitle(State.scores);
+
+  if (_saveFailed) {
+    Audio.playWarning();
+    _vibrate([20, 20, 20]);
+  } else {
+    Audio.playComplete();
+    _vibrate([40, 20, 40, 20, 80]);
+  }
 
   // ハイスコアを localStorage に保存（モード別）
   var _hiKey = 'shut_hi_' + (State.mode ? State.mode.id : 'cool');
@@ -817,17 +825,19 @@ async function gotoComplete() {
   }
 
   UI.buildCompleteScreen(State.mode, CLIPS_NEEDED, _finalBlob, _shootTime, {
-    scores:   State.scores,
+    scores:   _saveFailed ? [] : State.scores,
     title:    _scoreTitle,
     maxCombo: State.maxCombo,
     prevBest: _hiPrev,
     isNewHi:  _isNewHi,
+    recordingError: _saveFailed,
+    recordingErrorReason: stopResult.reason || Recorder.getLastError(),
   });
   UI.showScreen('complete');
 
   // FULL PERFECT: シーン間の全トランジションがPERFECT
   const expectedTransitions = Math.max(1, CLIPS_NEEDED - 1);
-  if (_scoreTitle && _scoreTitle.title === 'FULL PERFECT!' && State.scores.length >= expectedTransitions) {
+  if (!_saveFailed && _scoreTitle && _scoreTitle.title === 'FULL PERFECT!' && State.scores.length >= expectedTransitions) {
     _T(() => {
       _vibrate([100, 50, 100, 50, 100]);
       UI.showToast('🎯 FULL PERFECT! 完璧なタイミング！', 3000);
@@ -850,6 +860,8 @@ async function gotoComplete() {
         setTimeout(() => { btnDl.disabled = false; }, 3000);
       });
     }, 400);
+  } else if (_saveFailed) {
+    _T(() => UI.showToast('動画を保存できませんでした。もう一度撮影してください。', 4000), 300);
   }
 }
 

@@ -1,8 +1,8 @@
 /**
- * sw.js — v38
- * 2シーン撮影フローとシーン間準備UIを配信するためキャッシュ更新。
+ * sw.js — v40
+ * iPhone向け録画確定待機と保存失敗UIの最終版を配信するためキャッシュ更新。
  */
-const CACHE  = 'shut-v38';
+const CACHE  = 'shut-v40';
 const ASSETS = [
   '/',
   '/index.html',

@@ -1,6 +1,6 @@
 # SHUT — スマホ撮影レシピ 仕様書
 
-> Version: v38 | Updated: 2026-07-15
+> Version: v40 | Updated: 2026-07-15
 
 ---
 
@@ -217,6 +217,8 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 - シーンAからBまで1つの`MediaRecorder`で連続収録
 - トランジションの余韻後に`pauseClip()`、シーンBのGOで`resumeClip()`
 - 一時停止中の移動・着替え・構図準備は完成動画へ含めない
+- MP4最終化は最大12秒待機し、空Blob・タイムアウト・録画エラーを結果として返す
+- 保存失敗時は完成演出を行わず、権限確認と再撮影を案内する
 - マイクストリームは一度取得したら再利用
 
 ### 6.6 share.js — 共有
@@ -243,7 +245,7 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 
 ### Service Worker (sw.js)
 - 戦略: Stale-While-Revalidate
-- キャッシュ名: `shut-v38`（手動バージョニング）
+- キャッシュ名: `shut-v40`（手動バージョニング）
 - `e.waitUntil(fetchPromise)` でバックグラウンド更新を保護
 - オフラインフォールバック: `index.html`
 

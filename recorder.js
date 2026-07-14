@@ -17,6 +17,7 @@ const Recorder = (() => {
   let _busy        = false;
   let _stopWatchdog = null;
   let _paused      = false;
+  let _lastError   = null;
 
   function _detectMime() {
     if (typeof MediaRecorder === 'undefined') return '';
@@ -58,20 +59,30 @@ const Recorder = (() => {
     rec.onstop = () => {
       if (_stopWatchdog) { clearTimeout(_stopWatchdog); _stopWatchdog = null; }
       const blob = new Blob(_chunks, { type: _mime || 'video/webm' });
+      const ok = blob.size > 0;
       if (blob.size > 0) {
         _clips.push(blob);
+        _lastError = null;
         //console.log('[Recorder] clip' + _clips.length + ': ' + (blob.size / 1024 | 0) + 'KB');
       } else {
+        _lastError = 'empty';
         console.warn('[Recorder] 空クリップをスキップ');
       }
       _chunks = [];
       _busy   = false;
-      if (_stopRes) { _stopRes(); _stopRes = null; }
+      _paused = false;
+      if (_stopRes) {
+        _stopRes({ ok: ok, size: blob.size, reason: ok ? null : 'empty' });
+        _stopRes = null;
+      }
     };
     rec.onerror = e => {
       console.error('[Recorder] エラー:', e);
+      if (_stopWatchdog) { clearTimeout(_stopWatchdog); _stopWatchdog = null; }
+      _lastError = 'error';
       _busy = false;
-      if (_stopRes) { _stopRes(); _stopRes = null; }
+      _paused = false;
+      if (_stopRes) { _stopRes({ ok: false, size: 0, reason: 'error' }); _stopRes = null; }
     };
     return rec;
   }
@@ -104,6 +115,7 @@ const Recorder = (() => {
     _chunks = [];
     _busy   = false;
     _paused = false;
+    _lastError = null;
     _recorder = _build(_stream);
     return !!_recorder;
   }
@@ -118,16 +130,31 @@ const Recorder = (() => {
 
   function stopClip() {
     return new Promise(resolve => {
-      if (!_recorder || _recorder.state === 'inactive') { resolve(); return; }
+      if (!_recorder || _recorder.state === 'inactive') {
+        const blob = getFinalBlob();
+        resolve({ ok: !!blob, size: blob ? blob.size : 0, reason: blob ? null : 'inactive' });
+        return;
+      }
       _busy    = true;
       _stopRes = resolve;
       _stopWatchdog = setTimeout(() => {
         console.warn('[Recorder] stopClip タイムアウト');
+        _stopWatchdog = null;
+        _lastError = 'timeout';
         _busy = false;
-        if (_stopRes) { _stopRes(); _stopRes = null; }
-      }, 2000);
-      if (_recorder.state === 'paused') _recorder.resume(); // pause中はresume後にstop
-      _recorder.stop();
+        _paused = false;
+        if (_stopRes) { _stopRes({ ok: false, size: 0, reason: 'timeout' }); _stopRes = null; }
+      }, 12000);
+      try {
+        if (_recorder.state === 'paused') _recorder.resume(); // pause中はresume後にstop
+        _recorder.stop();
+      } catch (e) {
+        if (_stopWatchdog) { clearTimeout(_stopWatchdog); _stopWatchdog = null; }
+        _lastError = 'stop-error';
+        _busy = false;
+        _paused = false;
+        if (_stopRes) { _stopRes({ ok: false, size: 0, reason: 'stop-error' }); _stopRes = null; }
+      }
     });
   }
 
@@ -168,8 +195,9 @@ const Recorder = (() => {
   function getMime()      { return _mime; }
   function getClipCount() { return _clips.length; }
   function isRecording()  { return !!_recorder && _recorder.state === 'recording'; }
-  function isPaused()     { return _paused; }
+  function isPaused()     { return _paused || (!!_recorder && _recorder.state === 'paused'); }
   function isBusy()       { return _busy; }
+  function getLastError() { return _lastError; }
 
   function reset() {
     if (_recorder) {
@@ -181,8 +209,9 @@ const Recorder = (() => {
       }
     }
     if (_stopWatchdog) { clearTimeout(_stopWatchdog); _stopWatchdog = null; }
+    if (_stopRes) { _stopRes({ ok: false, size: 0, reason: 'reset' }); _stopRes = null; }
     _clips = []; _chunks = [];
-    _busy = false; _paused = false; _stopRes = null;
+    _busy = false; _paused = false; _lastError = null;
   }
 
   function destroy() {
@@ -215,7 +244,7 @@ const Recorder = (() => {
   return {
     setup, startClip, stopClip, pauseClip, resumeClip,
     getFinalBlob, getClips, getMime,
-    getClipCount, isRecording, isPaused, isBusy,
+    getClipCount, isRecording, isPaused, isBusy, getLastError,
     reset, destroy, destroyAll,
   };
 })();

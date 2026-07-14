@@ -1280,6 +1280,12 @@ html, body {
   margin-bottom: 5px;
   animation: fadeUp 0.5s var(--ease-out) 0.6s both;
 }
+.complete-meta.recording-error .complete-flavor {
+  color: var(--color-ink);
+  font-weight: 700;
+  line-height: 1.8;
+  animation: none;
+}
 .complete-stats {
   font-family: var(--font-label); font-size: 11px;
   color: rgba(var(--color-ink-rgb), 0.45); letter-spacing: 0.02em;

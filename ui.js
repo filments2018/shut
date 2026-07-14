@@ -887,6 +887,7 @@ const UI = (() => {
 
   // ── 完成画面 ───────────────────────────────────
   function buildCompleteScreen(mode, totalClips, previewBlob, shootTime, scoreData) {
+    const recordingError = !!(scoreData && scoreData.recordingError);
     // 前回のスコアパネルをリセット（2周目対応）
     var prevPanel = $('score-panel');
     if (prevPanel) {
@@ -930,12 +931,16 @@ const UI = (() => {
     // スコア称号・星表示
     const title = $('complete-title');
     if (title) {
-      var titleText = (scoreData && scoreData.title) ? scoreData.title.title : 'VIDEO COMPLETE';
+      var titleText = recordingError
+        ? '保存できませんでした'
+        : ((scoreData && scoreData.title) ? scoreData.title.title : 'VIDEO COMPLETE');
       // stars:0 → _makeStars(0) は空文字 → 録画なし・スコアなし時は星を表示しない
-      var stars = (scoreData && scoreData.title) ? scoreData.title.stars : 0;
+      var stars = recordingError ? 0 : ((scoreData && scoreData.title) ? scoreData.title.stars : 0);
       // animation は .complete-title-text 側でかけることで span 競合を回避
       var titleCls = (titleText === 'FULL PERFECT!') ? 'complete-title-text full-perfect' : 'complete-title-text';
-      var titleStyle = (titleText === 'FULL PERFECT!')
+      var titleStyle = recordingError
+        ? 'font-size:20px;color:var(--color-coral);text-shadow:none'
+        : (titleText === 'FULL PERFECT!')
         ? '' // full-perfect クラスで色・shadow を管理
         : 'color:' + mode.color + ';text-shadow:0 0 24px ' + mode.color;
       // 長い称号はフォントサイズを縮小（折り返し防止）
@@ -962,6 +967,7 @@ const UI = (() => {
 
     const meta = $('complete-meta');
     if (meta) {
+      meta.classList.toggle('recording-error', recordingError);
       const hashtags = mode.hashtags || '#SHUT';
       const clipSec  = ((60000 / mode.bpm) * (mode.beatsPerClip || 6) / 1000).toFixed(1);
       const totalSec = (parseFloat(clipSec) * totalClips).toFixed(0);
@@ -975,13 +981,16 @@ const UI = (() => {
         var mm = String(shootTime.getMinutes()).padStart(2, '0');
         tsStr = mo + '/' + dd + '  ' + hh + ':' + mm;
       }
+      var flavor = recordingError
+        ? '動画データを作れませんでした。カメラとマイクの許可を確認して、もう一度撮影してください。'
+        : (mode.completeMsg || '');
       meta.innerHTML =
-        '<div class="complete-flavor">' + (mode.completeMsg || '') + '</div>' +
+        '<div class="complete-flavor">' + flavor + '</div>' +
         '<div class="complete-stats">' +
         mode.label + ' RECIPE  ·  ' + totalClips + ' SCENES  ·  約' + totalSec + '秒' +
         (tsStr ? '  ·  ' + tsStr : '') +
         '</div>' +
-        '<div class="complete-hashtags" title="タップでコピー">' + hashtags + '</div>';
+        (recordingError ? '' : '<div class="complete-hashtags" title="タップでコピー">' + hashtags + '</div>');
       // ハッシュタグをタップでクリップボードへ
       _pulseTimeout(() => {
         const ht = meta.querySelector('.complete-hashtags');
@@ -1106,9 +1115,12 @@ const UI = (() => {
     // シェアボタンにモードカラーグローを適用
     const btnShare = document.getElementById('btn-share');
     if (btnShare) {
+      btnShare.style.display = recordingError ? 'none' : '';
       btnShare.style.background = 'linear-gradient(135deg,' + mode.color + ',' + mode.accent + ')';
       btnShare.style.boxShadow  = '0 4px 24px ' + mode.color + '66';
     }
+    const btnDownload = document.getElementById('btn-download');
+    if (btnDownload && recordingError) btnDownload.style.display = 'none';
 
     // 動画プレビューはアクション直前に表示（保存ボタンと近い位置）
     // 少し遅らせてアニメーション後に挿入
@@ -1120,7 +1132,9 @@ const UI = (() => {
     var particleColor = (scoreData && scoreData.title && scoreData.title.title === 'FULL PERFECT!')
       ? '#FFE566' : mode.color;
     // showScreen 後 1フレーム待って canvas サイズ確定後にパーティクル発火
-    requestAnimationFrame(() => requestAnimationFrame(() => _runParticles(particleColor)));
+    if (!recordingError) {
+      requestAnimationFrame(() => requestAnimationFrame(() => _runParticles(particleColor)));
+    }
   }
 
   /** 星n個を文字列で返す。n=0の場合は空文字（スコアなし） */
