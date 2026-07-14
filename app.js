@@ -4,7 +4,7 @@
  * 修正: splash → permission の遷移を showScreen() 統一
  * 修正: Recorder.pauseClip/resumeClip の実装呼び出しを確認済みに更新
  * 追加: ハプティクスフィードバック（振動）
- * 追加: クリップ数設定（CLIPS_NEEDED を 2/4/6 に変更可能）
+ * 追加: 2シーン連続録画（シーン間は pause/resume で準備時間を除外）
  * 追加: Audio.playModeSelect() をモード選択時に鳴らす
  * 追加: 完成画面にハッシュタグテキスト生成
  */
@@ -12,13 +12,23 @@
 const MODES = [
   {
     id: 'whip', label: 'WHIP', bpm: 96,
-    color: '#00D4FF', accent: '#10B981', bg: '#020909',
+    color: '#2170AC', accent: '#C9503A', bg: '#101720',
     guide: 'PAN RIGHT FAST', arrow: '→', emoji: '⚡',
     completeMsg: 'WHIP PAN. 振るスピードと方向をそろえて場面をつなぐ。',
     hashtags: '#SHUT #WHIP #スマホ撮影 #映像で遊ぼう',
     beatsPerClip: 5,
     recipeType: 'transition',
     recipeSummary: '素早いパンのブレでカットA/Bをつなぐ',
+    shots: [
+      { guide: '被写体を正面に止めて映す', arrow: '•', hud: 'SCENE A  静止' },
+      { guide: '振りながら入り、被写体で止める', arrow: '→', hud: 'SCENE B  IN → 静止' },
+    ],
+    transition: {
+      label: 'WHIP', arrow: 'any', trigger: 'motion', tailMs: 260,
+      prompt: '好きな方向へ、すぐに振り切る',
+      prepare: '次の場所へ移動し、同じ方向から被写体へ振り込める位置に構える。',
+      ready: 'STARTを押したら、カウントダウン中にカメラを振り始める位置へ向ける。',
+    },
     steps: [
       { guide: '被写体を正面に向けてカメラを止める', arrow: '•', hud: 'SCENE A  静止' },
       { guide: 'バーが埋まったら → に振る', arrow: '→', hud: '→ WHIP READY' },
@@ -28,13 +38,23 @@ const MODES = [
   },
   {
     id: 'cover', label: 'COVER', bpm: 88,
-    color: '#22D3EE', accent: '#FF2D78', bg: '#001014',
+    color: '#2A794F', accent: '#E3B92E', bg: '#0F1712',
     guide: 'COVER THE LENS', arrow: '■', emoji: '✋',
     completeMsg: 'HAND COVER. レンズを完全に暗くして、場所や衣装を一瞬で変える。',
     hashtags: '#SHUT #HANDCOVER #スマホ撮影 #トランジション',
     beatsPerClip: 5,
     recipeType: 'transition',
     recipeSummary: '手や物でレンズを隠して場面を切り替える',
+    shots: [
+      { guide: '被写体を止めて見せる', arrow: '•', hud: 'SCENE A  被写体' },
+      { guide: 'GOで手をどけ、被写体を見せる', arrow: '✦', hud: 'SCENE B  REVEAL' },
+    ],
+    transition: {
+      label: 'COVER', arrow: '■', trigger: 'tap', tailMs: 180,
+      prompt: 'レンズを完全に塞いだら画面をタップ',
+      prepare: '場所や衣装を変え、レンズを手で完全に塞げる状態にする。',
+      ready: 'STARTを押したら、カウントダウン中にレンズを完全に塞ぐ。',
+    },
     steps: [
       { guide: 'カットA。被写体を止めて見せる', arrow: '•', hud: 'A  被写体を見せる' },
       { guide: '手のひらでレンズを完全に塞ぐ', arrow: '■', hud: 'A COVER  真っ暗にする' },
@@ -44,13 +64,23 @@ const MODES = [
   },
   {
     id: 'match', label: 'MATCH', bpm: 100,
-    color: '#FF2D78', accent: '#FACC15', bg: '#120006',
+    color: '#B84632', accent: '#2E86C9', bg: '#1B100C',
     guide: 'MATCH THE MOTION', arrow: '↥', emoji: '🏃',
     completeMsg: 'MOTION MATCH. 被写体の位置とサイズをそろえて動作でつなぐ。',
     hashtags: '#SHUT #MOTIONMATCH #スマホ撮影 #videotips',
     beatsPerClip: 5,
     recipeType: 'action',
     recipeSummary: 'ジャンプや歩きなど同じ動きでカットを合わせる',
+    shots: [
+      { guide: '被写体の位置とサイズを決める', arrow: '□', hud: 'SCENE A  FRAME' },
+      { guide: 'GOで同じ動作の続きを始める', arrow: '↥', hud: 'SCENE B  ACTION' },
+    ],
+    transition: {
+      label: 'CUT', arrow: '↥', trigger: 'tap', tailMs: 120,
+      prompt: '動作の頂点で画面をタップ',
+      prepare: '別の場所で、人物の位置と大きさをシーンAに合わせる。',
+      ready: 'STARTを押したら、カウントダウンに合わせて同じ動作を準備する。',
+    },
     steps: [
       { guide: 'カットA。被写体の位置とサイズを決める', arrow: '□', hud: 'A FRAME  位置合わせ' },
       { guide: 'ジャンプや指鳴らしの瞬間で切る', arrow: '↥', hud: 'A ACTION  動作で切る' },
@@ -60,13 +90,23 @@ const MODES = [
   },
   {
     id: 'wipe', label: 'WIPE', bpm: 92,
-    color: '#FACC15', accent: '#10B981', bg: '#0b0900',
+    color: '#7A4EB0', accent: '#3E9E6E', bg: '#150F1D',
     guide: 'SLIDE BEHIND OBJECT', arrow: '▌→', emoji: '🚪',
     completeMsg: 'OBJECT WIPE. 柱や壁で画面を隠して、横移動で場面を変える。',
     hashtags: '#SHUT #OBJECTWIPE #スマホ撮影 #カメラワーク',
     beatsPerClip: 5,
     recipeType: 'foreground',
     recipeSummary: '柱や壁などの遮蔽物で画面を完全に隠す',
+    shots: [
+      { guide: '柱や壁へ向かって横移動する', arrow: '→', hud: 'SCENE A  WIPE OUT' },
+      { guide: 'GOで遮蔽物の裏から横へ抜ける', arrow: '→', hud: 'SCENE B  WIPE IN' },
+    ],
+    transition: {
+      label: 'WIPE', arrow: '→', trigger: 'motion', tailMs: 220,
+      prompt: '画面が完全に隠れた瞬間にタップか横振り',
+      prepare: '似た柱や壁の裏へ移動し、画面が完全に隠れた状態にする。',
+      ready: 'STARTを押したら、カウントダウン中に遮蔽物の裏で構える。',
+    },
     steps: [
       { guide: 'カットA。柱や壁の横に構える', arrow: '▌', hud: 'A SET  遮蔽物' },
       { guide: 'カニ歩きで横移動し、画面を完全に隠す', arrow: '→', hud: 'A WIPE  隠す' },
@@ -76,8 +116,9 @@ const MODES = [
   },
 ];
 
-// クリップ数（2/4/6 から選択可能、URL?clips=N で上書き）
-let CLIPS_NEEDED = 4;
+// 実際のトランジション撮影単位: シーンA + シーンB
+// デバッグ時のみ URL?clips=4/6 で連続シーン数を増やせる。
+let CLIPS_NEEDED = 2;
 
 // グローバル公開（ui.js の window.State 参照で使用）
 window.State = null;
@@ -95,6 +136,7 @@ const State = window.State = {
   maxCombo:    0,
   // 前クリップの振り方向（次クリップの入りに引き継ぐ）
   lastWhipDir: null,  // '→' | '←' | '↑' | '↓'
+  transitionCommitted: false,
 };
 
 function _T(fn, ms) {
@@ -183,7 +225,7 @@ function _checkOrientation() {
   const warn = document.getElementById('orientation-warn');
   if (!warn) return;
   const isLandscape = window.innerWidth > window.innerHeight;
-  const inCamera = ['countdown', 'recording', 'shutter', 'executing', 'processing'].includes(State.phase);
+  const inCamera = ['countdown', 'recording', 'shutter', 'executing', 'processing', 'prepare'].includes(State.phase);
   warn.style.display = (isLandscape && inCamera) ? 'flex' : 'none';
 }
 window.addEventListener('resize', _checkOrientation);
@@ -202,6 +244,7 @@ function gotoSelect() {
   State.combo      = 0;
   State.maxCombo   = 0;
   State.lastWhipDir = null;
+  State.transitionCommitted = false;
 
   Motion.setActive(false);
   Audio.stop();
@@ -214,6 +257,7 @@ function gotoSelect() {
   UI.stopViz();
   UI.hideDummyBackground();
   UI.hideFlipBtn();
+  UI.hidePrepareNext();
   UI.cleanupPreview();
   UI.stopParticles();
   if (typeof UI.clearPulseTimers === 'function') UI.clearPulseTimers();
@@ -221,9 +265,9 @@ function gotoSelect() {
 
   _resetBtn('btn-download');
 
-  document.body.style.background = '#050505';
-  document.documentElement.style.setProperty('--c',     '#00D4FF');
-  document.documentElement.style.setProperty('--c-rgb', '0,212,255');
+  document.body.style.background = '#F6F2E4';
+  document.documentElement.style.setProperty('--c',     '#2170AC');
+  document.documentElement.style.setProperty('--c-rgb', '33,112,172');
   UI.buildModeList(MODES, _onModeSelect, m => {
     UI.updateVizBpm(m.bpm, m.color);
     // ホバー時にレシピのテンポを1発鳴らして「動きの感触」を伝える
@@ -359,6 +403,7 @@ async function startMode(mode) {
   UI.stopRecBar();
   UI.hideRecIndicator();
   UI.hideDummyBackground();
+  UI.hidePrepareNext();
   UI.showScreen('camera');
   _checkOrientation();
 
@@ -402,7 +447,7 @@ async function startMode(mode) {
 
 // カメラフリップ — 録画中・countdown中は禁止
 async function _flipCamera() {
-  const blocked = ['countdown', 'recording', 'executing', 'processing', 'shutter'].includes(State.phase);
+  const blocked = ['countdown', 'recording', 'executing', 'processing', 'shutter', 'prepare'].includes(State.phase);
   if (blocked) {
     UI.showToast('⚠ 撮影中はカメラを切り替えられません', 2000);
     return;
@@ -437,10 +482,10 @@ function gotoCountdown() {
   var countMs   = Math.max(450, Math.min(countBeat, 800)); // 450〜800ms（POPのビートに合わせて450に変更）
 
   let count = 3;
-  var firstStep = _getRecipeStep(0);
+  var currentShot = _getShotStep(State.clips);
   UI.setCenter('countdown', count);
-  // カウントダウン中: レシピガイドを薄く表示（録画前に動きを体で覚える）
-  UI.setGuideText(firstStep ? firstStep.guide : (State.mode ? State.mode.guide : ''), true);  // true=dim
+  // カウントダウン中: 現在のシーンガイドを薄く表示
+  UI.setGuideText(currentShot ? currentShot.guide : (State.mode ? State.mode.guide : ''), true);
   Audio.playCountTick(false, State.mode ? State.mode.id : 'cool');
   _vibrate(30);
 
@@ -471,7 +516,7 @@ function gotoRecording() {
 
   const m   = State.mode;
   const dur = (60000 / m.bpm) * (m.beatsPerClip || 6);
-  const step = _getRecipeStep(State.clips);
+  let step = _getShotStep(State.clips);
 
   // クリップ開始時にREC枠フラッシュ（clips=0は白、clips>0は入り方向カラー）
   var vfMain = document.getElementById('vf-main');
@@ -482,20 +527,6 @@ function gotoRecording() {
     } else {
       vfMain.classList.add('enter-flash');
       setTimeout(function() { vfMain.classList.remove('enter-flash'); }, 450);
-    }
-  }
-
-  // WHIPモード: 動的ガイド（前クリップの振り方向から入る）
-  if (m.id === 'whip') {
-    if (State.clips === 0) {
-      step = { guide: '被写体を正面に止めて映す', arrow: '•', hud: 'SCENE A  静止' };
-    } else {
-      var _enterDir = State.lastWhipDir || '→';
-      step = {
-        guide: _enterDir + ' から入り、被写体を止める',
-        arrow: _enterDir,
-        hud: _enterDir + ' IN → 静止',
-      };
     }
   }
 
@@ -530,59 +561,61 @@ function gotoRecording() {
       _T(() => UI.showToast('📹 ' + s.width + 'x' + s.height, 2000), 300);
     }
   }
-  UI.startRecBar(dur, () => { gotoShutter(); }, m.bpm);
+  UI.startRecBar(dur, () => {
+    if (State.clips >= CLIPS_NEEDED - 1) {
+      finishFinalShot();
+    } else {
+      gotoShutter();
+    }
+  }, m.bpm);
 }
 
 function gotoShutter() {
   _clearTimers();
   State.phase = 'shutter';
+  State.transitionCommitted = false;
   // freezeForTiming() で _nextBeat/_bpm を保持してタイミング評価を正確にする
   Audio.freezeForTiming();
   UI.stopRecBar();
   UI.hideRecIndicator();
   UI.cancelShutterCountdown();
 
-  // 録画を一時停止（stop ではなく pause → gotoComplete で1回だけ stop）
-  if (State.recEnabled && Recorder.isRecording()) {
-    Recorder.pauseClip();
-  }
-
-  // WHIPモード: 好きな方向に振れる（4方向表示）
-  // その他のモード: レシピ指定方向
-  if (State.mode && State.mode.id === 'whip') {
-    UI.setCenter('shutter', 'any');
-    UI.setGuideText('', false);  // shut-sub と重複しないよう空にする
-    UI.setHudStatus('📳 &nbsp;<strong>↑↓←→ WHIP!</strong>');
-  } else {
-    var _shutStep  = _getRecipeStep(State.clips);
-    var _shutArrow = (_shutStep && _shutStep.arrow && _shutStep.arrow !== '•')
-      ? _shutStep.arrow
-      : (State.mode ? State.mode.arrow : '→');
-    UI.setCenter('shutter', _shutArrow);
-    UI.setGuideText(_shutArrow + '  この方向に素早く振る', false);
-    UI.setHudStatus('📳 &nbsp;<strong>' + _shutArrow + ' WHIP!</strong>');
-  }
+  // ここでは録画を止めない。ユーザーの物理トランジションを動画に残す。
+  var transition = _getTransition();
+  UI.setCenter('transition', {
+    label: transition.label,
+    arrow: transition.arrow,
+    sub: transition.prompt,
+  });
+  UI.setGuideText(transition.prompt, false);
+  UI.setHudStatus('<strong>TRANSITION NOW</strong> &nbsp; 動作したらタップ');
   UI.updateRemainingClips(CLIPS_NEEDED - State.clips, CLIPS_NEEDED);
   _vibrate(15);
 
-  Motion.setActive(true);
+  Motion.setActive(transition.trigger === 'motion');
   Motion.resetCooldown();
 
-  // シュット待機タイムアウト（8秒で自動的に次クリップへ）
-  UI.startShutterCountdown(8, () => {
-    // タイムアウト時: MISS表示 + 警告音 → 録画に戻る
+  // 待ち時間も録画されるため4秒で打ち切り、次シーン準備へ進める。
+  UI.startShutterCountdown(4, () => {
     if (State.phase !== 'shutter') return;
+    State.transitionCommitted = true;
+    State.phase = 'processing';
+    Motion.setActive(false);
     State.scores.push({ grade: 'MISS', offset: null, timeout: true });
-    if (State.combo > 0) State.combo = 0;
+    State.combo = 0;
     UI.showGradePopup('MISS', 0);
     Audio.playWarning();
     _vibrate([20, 20, 20]);
-    _T(gotoRecording, 600);
+    if (State.recEnabled && Recorder.isRecording()) Recorder.pauseClip();
+    UI.markClipDone(State.clips);
+    State.clips++;
+    _T(gotoPrepareNext, 600);
   });
 }
 
 function executeShut() {
-  if (State.phase !== 'shutter') return;
+  if (State.phase !== 'shutter' || State.transitionCommitted) return;
+  State.transitionCommitted = true;
   State.phase = 'executing';
   Motion.setActive(false);
   UI.cancelShutterCountdown();
@@ -623,27 +656,94 @@ function executeShut() {
   // タイミング評価UI表示
   UI.showGradePopup(grade, State.combo);
 
-  UI.markClipDone(State.clips);
-  State.clips++;
-
-  if (State.clips >= CLIPS_NEEDED) {
-    _T(gotoComplete, 480);
-  } else {
-    // BPM に合わせた間隔（1拍分）でリズムを維持
-    var beatMs = Math.round(60000 / (State.mode ? State.mode.bpm : 100));
-    var transMs = Math.max(500, Math.min(beatMs, 600)); // blur-swipe完了(460ms)を確実に待つ
-    // 次クリップ番号を一瞬だけ HUD に表示してリズムを保持
-    UI.setHudStatus(
-      '<span style="letter-spacing:0.2em;opacity:0.7">CLIP ' +
-      (State.clips + 1) + ' / ' + CLIPS_NEEDED + '</span>'
-    );
-    _T(gotoRecording, transMs);
-  }
+  // 動作直後のブラー/暗転を少し録画してからpauseする。
+  var transition = _getTransition();
+  UI.setHudStatus('<strong>CAPTURED</strong> &nbsp; 動きを止める');
+  _T(() => {
+    if (State.recEnabled && Recorder.isRecording()) Recorder.pauseClip();
+    UI.markClipDone(State.clips);
+    State.clips++;
+    gotoPrepareNext();
+  }, transition.tailMs || 220);
 }
 
-function _getRecipeStep(index) {
-  if (!State.mode || !State.mode.steps || State.mode.steps.length === 0) return null;
-  return State.mode.steps[index % State.mode.steps.length];
+function _getTransition() {
+  if (State.mode && State.mode.transition) return State.mode.transition;
+  return {
+    label: 'SHUT', arrow: State.mode ? State.mode.arrow : '→',
+    trigger: 'motion', tailMs: 220,
+    prompt: '素早く振ったら画面をタップ',
+    prepare: '次のシーンを準備する。',
+    ready: 'STARTを押して構える。',
+  };
+}
+
+function _getShotStep(index) {
+  if (!State.mode) return null;
+  var shots = State.mode.shots && State.mode.shots.length
+    ? State.mode.shots
+    : State.mode.steps;
+  if (!shots || shots.length === 0) return null;
+  var step = Object.assign({}, shots[index % shots.length]);
+
+  // WHIPのシーンBは、シーンAで実際に振った方向を入口へ引き継ぐ。
+  if (State.mode.id === 'whip' && index > 0) {
+    var dir = State.lastWhipDir || '→';
+    step.arrow = dir;
+    step.guide = dir + ' から振り込み、被写体で止める';
+    step.hud = 'SCENE B  ' + dir + ' IN → 静止';
+  }
+  return step;
+}
+
+function gotoPrepareNext() {
+  _clearTimers();
+  State.phase = 'prepare';
+  Motion.setActive(false);
+  Audio.stop();
+  UI.stopRecBar();
+  UI.hideRecIndicator();
+  UI.setCenter('empty');
+  UI.setGuideText('', false);
+
+  var transition = _getTransition();
+  var direction = State.mode && State.mode.id === 'whip'
+    ? (State.lastWhipDir || '→') + '方向をそろえる。'
+    : '';
+  UI.showPrepareNext({
+    scene: State.clips + 1,
+    total: CLIPS_NEEDED,
+    title: '次のシーンを準備',
+    description: direction + transition.prepare,
+    ready: transition.ready,
+  });
+}
+
+function startNextScene() {
+  if (State.phase !== 'prepare') return;
+  Audio.unlock();
+  UI.hidePrepareNext();
+  _vibrate(20);
+  gotoCountdown();
+}
+
+function finishFinalShot() {
+  if (State.phase !== 'recording') return;
+  State.phase = 'processing';
+  Motion.setActive(false);
+  Audio.stop();
+  UI.stopRecBar();
+  UI.hideRecIndicator();
+  UI.setCenter('empty');
+  UI.setGuideText('最後の構図をそのままキープ', false);
+  UI.setHudStatus('<strong>FINAL HOLD</strong> &nbsp; 保存準備中');
+
+  // 最後の余韻を録画に残してからMediaRecorderを確定する。
+  _T(() => {
+    UI.markClipDone(State.clips);
+    State.clips++;
+    gotoComplete();
+  }, 650);
 }
 
 /**
@@ -664,7 +764,7 @@ function _calcGrade(offset) {
   return 'MISS';
 }
 
-/** 全クリップの評価から称号を決定 */
+/** 全トランジションの評価から称号を決定 */
 function _calcTitle(scores) {
   const total   = scores.length;
   if (total === 0) return { title: 'VIDEO COMPLETE', stars: 0 };
@@ -683,18 +783,19 @@ async function gotoComplete() {
   _clearTimers();
   State.phase = 'complete';
   Motion.setActive(false);
+  UI.hidePrepareNext();
   Audio.stop();  // 完成後は freeze 状態も含めてリセット
-  Camera.stop();
   UI.hideFlipBtn();
   UI.updateRemainingClips(0, CLIPS_NEEDED);
   _checkOrientation();
 
-  // 1本の連続録画を停止してBlobを取得
+  // 映像トラックを止める前に、1本の連続録画を確定して最終チャンクを受け取る。
   if (State.recEnabled && (Recorder.isRecording() || Recorder.isPaused())) {
     UI.setHudStatus('<span class="processing-hud">● 保存中...</span>');
     const saveTimeout = new Promise(res => setTimeout(res, 5000));
     await Promise.race([Recorder.stopClip(), saveTimeout]);
   }
+  Camera.stop();
 
   Audio.playComplete();
   _vibrate([40, 20, 40, 20, 80]);
@@ -724,9 +825,9 @@ async function gotoComplete() {
   });
   UI.showScreen('complete');
 
-  // FULL PERFECT の場合は特別な演出
-  // FULL PERFECT: 全クリップで評価済みかつ全PERFECT
-  if (_scoreTitle && _scoreTitle.title === 'FULL PERFECT!' && State.scores.length >= CLIPS_NEEDED) {
+  // FULL PERFECT: シーン間の全トランジションがPERFECT
+  const expectedTransitions = Math.max(1, CLIPS_NEEDED - 1);
+  if (_scoreTitle && _scoreTitle.title === 'FULL PERFECT!' && State.scores.length >= expectedTransitions) {
     _T(() => {
       _vibrate([100, 50, 100, 50, 100]);
       UI.showToast('🎯 FULL PERFECT! 完璧なタイミング！', 3000);
@@ -913,6 +1014,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
 
+  on('btn-next-scene', startNextScene);
+  on('btn-cancel-shoot', () => {
+    _vibrate(15);
+    gotoSelect();
+  });
+
   on('btn-share', async () => {
     _vibrate(15);
     const blob = State._cachedBlob || null;
@@ -1013,7 +1120,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// ── デバッグパネル: クリップ数変更 ──────────────
+// ── デバッグパネル: シーン数変更 ────────────────
 window._setClips = function(n) {
   CLIPS_NEEDED = n;
   [2, 4, 6].forEach(v => {
@@ -1022,8 +1129,8 @@ window._setClips = function(n) {
   });
   // how-to-box のテキストも即時更新
   const htb = document.getElementById('how-to-clips');
-  if (htb) htb.textContent = n + 'カット';
-  UI.showToast('クリップ数: ' + n, 1500);
+  if (htb) htb.textContent = n + 'シーン';
+  UI.showToast('シーン数: ' + n, 1500);
 };
 
 // ── デバッグパネル: 解像度選択ヘルパー ────────────

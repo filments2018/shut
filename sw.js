@@ -1,13 +1,12 @@
 /**
- * sw.js — v4
- * 修正: fetch handler で net=null のとき null を返す問題
- *       → Promise.resolve(null) は respondWith に渡せない → フォールバック強化
- * 修正: キャッシュ名を v11 に更新
+ * sw.js — v38
+ * 2シーン撮影フローとシーン間準備UIを配信するためキャッシュ更新。
  */
-const CACHE  = 'shut-v33';
+const CACHE  = 'shut-v38';
 const ASSETS = [
   '/',
   '/index.html',
+  '/tokens.css',
   '/styles.css',
   '/motion.js',
   '/camera.js',

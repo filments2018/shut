@@ -1,22 +1,23 @@
 # SHUT — スマホ撮影レシピ 仕様書
 
-> Version: v30 | Updated: 2026-04-11
+> Version: v38 | Updated: 2026-07-15
 
 ---
 
 ## 1. プロダクト概要
 
-**SHUT** は、スマホだけでプロ級のショート動画素材を撮影できる PWA（Progressive Web App）。カメラワーク（トランジション手法）を「レシピ」として提供し、画面のガイドに従って撮影するだけで、WhipPan・HandCover・MotionMatch・ObjectWipe といった映像技法を実践できる。
+**SHUT** は、スマホだけでトランジション動画を撮影できる PWA（Progressive Web App）。カメラワークを「レシピ」として提供し、シーンAとシーンBを画面のガイドに従って撮ると、WhipPan・HandCover・MotionMatch・ObjectWipe のつながった動画を1本で保存できる。
 
 ### コアコンセプト
-- **レシピ選択 → ガイド撮影 → シュッと振ってカット** の3ステップ
+- **レシピ選択 → シーンA → トランジション → シーンB** の撮影フロー
+- シーン間の移動・着替え・構図準備は完成動画から自動で除外
 - BPM（テンポ）に合わせたビートガイドでリズミカルに撮影
-- 加速度センサーで「シュッ！」と振る動作を検出しカットを切替
+- 加速度センサーまたは画面タップでトランジション動作を確定
 - タイミング精度をスコア評価（PERFECT / GOOD / OK / MISS）
 
 ### ターゲットユーザー
 - ショート動画クリエイター（TikTok / Instagram Reels / YouTube Shorts）
-- 映像制作初心者〜中級者
+- 動画制作初心者〜中級者
 - スマホのみで撮影したい人
 
 ---
@@ -27,7 +28,7 @@
 |------|------|
 | フロントエンド | バニラ JavaScript（フレームワークなし） |
 | スタイリング | CSS3（カスタムプロパティ、アニメーション、Grid/Flex） |
-| フォント | Google Fonts（Orbitron + Share Tech Mono、非同期読み込み） |
+| フォント | Google Fonts（Plus Jakarta Sans + M PLUS Rounded 1c + JetBrains Mono、非同期読み込み） |
 | 音声 | Web Audio API（ビートスケジューラ、BGM再生、BPM検出） |
 | カメラ | getUserMedia API |
 | 録画 | MediaRecorder API（H.264優先、5Mbps） |
@@ -64,9 +65,9 @@ shut/
 ## 4. 画面フロー（ステートマシン）
 
 ```
-splash → [iOS] permission → [初回] tutorial → select → countdown → recording ⇄ shutter → complete
-                                                  ↑                                        |
-                                                  +————————— btn-retry ————————————————————+
+splash → [iOS] permission → [初回] tutorial → select → countdown → recording(A) → shutter
+                                                  ↑                              ↓
+                                                  └────── complete ← recording(B) ← prepare
 ```
 
 ### フェーズ一覧
@@ -78,10 +79,11 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 | `tutorial` | 初回チュートリアル（3ステップ） | `select` |
 | `select` | レシピ（モード）選択 | `countdown`（via `startMode`） |
 | `countdown` | 3→2→1→GO! カウントダウン | `recording` |
-| `recording` | カメラ録画中（BPM同期） | `shutter`（バー完了時） |
-| `processing` | MediaRecorder.stopClip() 待機 | `shutter` |
-| `shutter` | 「シュッ！と振る」待機 | `executing`（振った時） |
-| `executing` | シュットエフェクト再生中 | `recording` or `complete` |
+| `recording` | シーンA/Bを録画中（BPM同期） | Aは`shutter`、Bは`complete` |
+| `shutter` | トランジション動作の検出・タップ待機 | `executing` or `prepare` |
+| `executing` | 動作の余韻を録画して一時停止 | `prepare` |
+| `processing` | タイムアウト時などの遷移処理 | `prepare` |
+| `prepare` | 録画を一時停止し、場所・衣装・構図を準備 | `countdown` |
 | `complete` | 完成画面（スコア・プレビュー・シェア） | `select`（リトライ） |
 
 ---
@@ -112,13 +114,22 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
   emoji: '⚡',
   completeMsg: 'WHIP PAN. 振るスピードと方向をそろえて場面をつなぐ。',
   hashtags: '#SHUT #WHIP #スマホ撮影 #映像で遊ぼう',
-  beatsPerClip: 5,        // 1クリップあたりの拍数
+  beatsPerClip: 5,        // 1シーンあたりの拍数
   recipeType: 'transition',
   recipeSummary: '素早いパンのブレでカットA/Bをつなぐ',
-  steps: [                // 各クリップのガイド
-    { guide: '...', arrow: '...', hud: '...' },
-    ...
+  shots: [                // シーンA/Bの撮影ガイド
+    { guide: '被写体を正面に止めて映す', arrow: '•', hud: 'SCENE A  静止' },
+    { guide: '振りながら入り、被写体で止める', arrow: '→', hud: 'SCENE B  IN → 静止' },
   ],
+  transition: {
+    label: 'WHIP',
+    arrow: 'any',
+    trigger: 'motion',    // motion または tap
+    tailMs: 260,          // 動作後に録画へ残す余韻
+    prompt: '好きな方向へ、すぐに振り切る',
+    prepare: '次の場所へ移動し、同じ方向から構える。',
+    ready: 'カウントダウン中に開始位置へ向ける。',
+  },
 }
 ```
 
@@ -138,11 +149,13 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 {
   phase: 'splash',       // 現在のフェーズ
   mode: null,            // 選択中のレシピ
-  clips: 0,              // 撮影済みクリップ数
+  clips: 0,              // 撮影済みシーン数
   recEnabled: false,     // MediaRecorder が有効か
-  scores: [],            // 各クリップの {grade, offset}
+  scores: [],            // 各トランジションの {grade, offset}
   combo: 0,              // 連続 GOOD 以上
   maxCombo: 0,           // 最大コンボ
+  transitionCommitted: false,
+  lastWhipDir: null,     // シーンAで検出した振り方向
   _cachedBlob: null,     // 完成動画 Blob のキャッシュ
 }
 ```
@@ -201,7 +214,9 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 - デスクトップ: VP9/WebM 優先
 - ビットレート: 映像 5Mbps / 音声 128kbps
 - チャンクサイズ: 250ms
-- `pauseClip()` / `resumeClip()` でバックグラウンド対応
+- シーンAからBまで1つの`MediaRecorder`で連続収録
+- トランジションの余韻後に`pauseClip()`、シーンBのGOで`resumeClip()`
+- 一時停止中の移動・着替え・構図準備は完成動画へ含めない
 - マイクストリームは一度取得したら再利用
 
 ### 6.6 share.js — 共有
@@ -228,7 +243,7 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 
 ### Service Worker (sw.js)
 - 戦略: Stale-While-Revalidate
-- キャッシュ名: `shut-v28`（手動バージョニング）
+- キャッシュ名: `shut-v38`（手動バージョニング）
 - `e.waitUntil(fetchPromise)` でバックグラウンド更新を保護
 - オフラインフォールバック: `index.html`
 
@@ -284,7 +299,7 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 - 加速度値リアルタイム表示
 - シュット感度スライダー（8-40 m/s²）
 - 解像度切替（480p/720p/1080p）
-- クリップ数切替（2/4/6）
+- シーン数切替（通常は2、デバッグ時のみ4/6）
 - フェーズ・録画状態・センサー状態の表示
 
 ---
@@ -294,7 +309,7 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 | パラメータ | 値 | 説明 |
 |-----------|-----|------|
 | `mode` | `whip` / `cover` / `match` / `wipe` | 指定レシピで即開始 |
-| `clips` | `2` / `4` / `6` | クリップ数を変更 |
+| `clips` | `2` / `4` / `6` | シーン数を変更（通常は2） |
 
 例: `https://shut.app/?mode=whip&clips=2`
 
@@ -326,3 +341,7 @@ git push origin main  # Netlify が自動デプロイ
 1. `sw.js` の `CACHE` 定数を `shut-vN+1` にインクリメント
 2. デプロイ後、ブラウザが24時間以内にSW更新を検出
 3. `activate` イベントで旧キャッシュを自動削除
+
+
+---
+※注記（2026-07-12 ナレッジ棚卸し）: ブランド表記注記: ターゲット記述に「映像制作初心者〜中級者」が残存しています。→ 2026-07-12 深瀬承認により「動画制作初心者〜中級者」へ修正済み。

@@ -1,6 +1,6 @@
 /**
  * ui.js — v6 完全版
- * 追加: updateRemainingClips() — 残りクリップ数の視覚カウンタ
+ * 追加: updateRemainingClips() — 残りシーン数の視覚カウンタ
  * 追加: showFlipBtn() / hideFlipBtn() — カメラ切替ボタン制御
  * 修正: setHudStatus の opacity アニメーションが競合する問題
  * 修正: buildBpmVisualizer を showScreen('select') 前に安全に呼べるよう遅延
@@ -80,7 +80,7 @@ const UI = (() => {
       n.style.color = 'var(--c)';
       n.style.fontSize = '12px';
       _pulseTimeout(function() {
-        n.textContent = 'C' + (i + 1);
+        n.textContent = 'S' + (i + 1);
         n.style.fontSize = '';
       }, 800);
     }
@@ -101,7 +101,7 @@ const UI = (() => {
       return;
     }
     el.style.opacity = '1';
-    el.textContent   = 'あと ' + remaining + ' カット';
+    el.textContent   = 'あと ' + remaining + ' シーン';
   }
 
   // ── カメラフリップボタン ───────────────────────
@@ -164,6 +164,29 @@ const UI = (() => {
       } else {
         cc.innerHTML = '<div class="arrow-guide">' + value + '</div>';
       }
+    } else if (type === 'transition') {
+      var cfg = value || {};
+      var label = cfg.label || 'SHUT';
+      var sub = cfg.sub || '動作したら画面をタップ';
+      if (cfg.arrow === 'any') {
+        cc.innerHTML =
+          '<div class="whip-any-arrows">' +
+            '<div class="whip-any-top">↑</div>' +
+            '<div class="whip-any-row">' +
+              '<span>←</span>' +
+              '<span class="whip-any-center">' + label + '</span>' +
+              '<span>→</span>' +
+            '</div>' +
+            '<div class="whip-any-bot">↓</div>' +
+          '</div>' +
+          '<div class="shut-sub">' + sub + '</div>';
+      } else {
+        cc.innerHTML =
+          '<div class="whip-dir-arrow">' + (cfg.arrow || '→') + '</div>' +
+          '<div class="shut-big">' + label + '</div>' +
+          '<div class="shut-sub">' + sub + '</div>';
+      }
+      _enterShutterMode();
     } else if (type === 'shutter') {
       if (value === 'any') {
         // WHIPモード: 4方向を全表示
@@ -214,6 +237,31 @@ const UI = (() => {
     } else {
       el.classList.remove('dim');
     }
+  }
+
+  // ── シーン間準備 ───────────────────────────────
+  function showPrepareNext(data) {
+    const overlay = $('shot-prepare-overlay');
+    if (!overlay) return;
+    const kicker = $('shot-prepare-kicker');
+    const title = $('shot-prepare-title');
+    const desc = $('shot-prepare-desc');
+    const ready = $('shot-prepare-ready');
+    if (kicker) kicker.textContent = 'SCENE ' + data.scene + ' / ' + data.total;
+    if (title) title.textContent = data.title || '次のシーンを準備';
+    if (desc) desc.textContent = data.description || '';
+    if (ready) ready.textContent = data.ready || '';
+    overlay.classList.add('show');
+    overlay.setAttribute('aria-hidden', 'false');
+    const btn = $('btn-next-scene');
+    if (btn) requestAnimationFrame(() => btn.focus({ preventScroll: true }));
+  }
+
+  function hidePrepareNext() {
+    const overlay = $('shot-prepare-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('show');
+    overlay.setAttribute('aria-hidden', 'true');
   }
 
   // HUD ステータス（opacity フェードイン、競合防止）
@@ -725,8 +773,8 @@ const UI = (() => {
         bar.style.width = (1 - p) * 100 + '%';
         // 残り2秒で赤くなる
         if (p > 0.75) {
-          bar.style.background = '#FF2D78';
-          bar.style.boxShadow  = '0 0 8px #FF2D78';
+          bar.style.background = '#DB4241';
+          bar.style.boxShadow  = '0 0 8px rgba(219,66,65,0.5)';
         }
       }
       if (p < 1) {
@@ -930,7 +978,7 @@ const UI = (() => {
       meta.innerHTML =
         '<div class="complete-flavor">' + (mode.completeMsg || '') + '</div>' +
         '<div class="complete-stats">' +
-        mode.label + ' RECIPE  ·  ' + totalClips + ' CUTS  ·  約' + totalSec + '秒' +
+        mode.label + ' RECIPE  ·  ' + totalClips + ' SCENES  ·  約' + totalSec + '秒' +
         (tsStr ? '  ·  ' + tsStr : '') +
         '</div>' +
         '<div class="complete-hashtags" title="タップでコピー">' + hashtags + '</div>';
@@ -1123,7 +1171,7 @@ const UI = (() => {
         '<span class="mode-label" style="color:' + m.color + '">' + m.label + '</span>' +
         lastBadgeHtml +
         '<span class="mode-bpm">' + recipeLabel + '</span>' +
-        '<span class="mode-duration">約' + totalSec + '秒 / ' + (clips || 4) + 'カット</span>' +
+        '<span class="mode-duration">約' + totalSec + '秒 / ' + (clips || 2) + 'シーン</span>' +
         '<span class="mode-guide-preview">' + (m.recipeSummary || m.guide) + '</span>';
       if (isLast) {
         btn.style.borderColor = m.color;
@@ -1150,9 +1198,9 @@ const UI = (() => {
     });
     if (modes.length > 0) buildBpmVisualizer('bpm-visualizer', modes[0].bpm);
 
-    // how-to-box の「Nカット」を動的に更新
+    // how-to-box の「Nシーン」を動的に更新
     const htb = document.getElementById('how-to-clips');
-    if (htb && clips) htb.textContent = clips + 'カット';
+    if (htb && clips) htb.textContent = clips + 'シーン';
   }
 
   // フリップボタンのクリックリスナー登録（HTML側のボタンに後付け）
@@ -1172,6 +1220,7 @@ const UI = (() => {
     updateRemainingClips,
     showFlipBtn, hideFlipBtn,
     setCenter, setGuideText, setHudStatus,
+    showPrepareNext, hidePrepareNext,
     beatPulse, stopViz, updateVizBpm,
     startShutterCountdown, cancelShutterCountdown,
     clearPulseTimers: _clearPulseTimers,

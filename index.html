@@ -7,24 +7,26 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="SHUT">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#000814">
+  <meta name="theme-color" content="#F6F2E4">
   <meta property="og:title"       content="SHUT — スマホ撮影レシピ">
-  <meta property="og:description" content="カメラワークを選んで、ガイド通りに撮るだけ。ショート動画の素材が作れる。">
+  <meta property="og:description" content="カメラワークを選び、2シーンをガイド通りに撮るだけ。スマホでトランジション動画が完成。">
   <meta property="og:type"        content="website">
   <meta property="og:image"       content="/icon-512.svg">
   <meta property="og:url"         content="https://shut.app/">
   <meta name="twitter:card"       content="summary_large_image">
   <meta name="twitter:title"      content="SHUT — スマホ撮影レシピ">
-  <meta name="twitter:description" content="カメラワークを選んで、ガイド通りに撮るだけ。ショート動画の素材が作れる。">
+  <meta name="twitter:description" content="カメラワークを選び、2シーンをガイド通りに撮るだけ。スマホでトランジション動画が完成。">
   <meta name="twitter:image"      content="/icon-512.svg">
-  <meta name="description"        content="カメラワークを選んで、ガイド通りに4カット撮る。スマホだけでショート動画の素材を作れる撮影アプリ。">
+  <meta name="description"        content="カメラワークを選んで、ガイド通りに2シーン撮る。スマホだけでトランジション動画を作れる撮影アプリ。">
   <link rel="manifest"         href="/manifest.json">
+  <link rel="icon"             href="/icon-192.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/icon-192.svg">
   <title>SHUT — スマホ撮影レシピ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap"></noscript>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=M+PLUS+Rounded+1c:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=M+PLUS+Rounded+1c:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+  <link rel="stylesheet" href="tokens.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -87,12 +89,12 @@
   <div class="tut-steps" id="tut-steps" role="region" aria-label="チュートリアル">
     <div class="tut-step active" data-step="0" role="tabpanel">
       <div class="tut-step-num">01</div>
-      <div class="tut-step-icon">🎬</div>
+      <div class="tut-step-icon" aria-hidden="true"></div>
       <div class="tut-step-title">レシピを選ぶ</div>
       <div class="tut-step-desc">
-        <strong style="color:#00D4FF">WHIP</strong>・
-        <strong style="color:#22D3EE">COVER</strong>・
-        <strong style="color:#FF2D78">MATCH</strong><br>
+        <strong style="color:#2170AC">WHIP</strong>・
+        <strong style="color:#2A794F">COVER</strong>・
+        <strong style="color:#B84632">MATCH</strong><br>
         撮りたいカメラワークから始める
       </div>
     </div>
@@ -107,7 +109,7 @@
     </div>
     <div class="tut-step" data-step="2" role="tabpanel">
       <div class="tut-step-num">03</div>
-      <div class="tut-step-icon tut-shake-anim">📱</div>
+      <div class="tut-step-icon tut-shake-anim" aria-hidden="true"></div>
       <div class="tut-step-title">シュッ！で切る</div>
       <div class="tut-step-desc">
         「SHUT!」が出たらスマホを素早く振る<br>
@@ -132,7 +134,7 @@
   <div class="select-header" style="position:relative">
     <div class="select-logo">SHUT</div>
   <div class="select-logo-sub">RECIPE CAMERA</div>
-    <button class="bgm-btn" id="btn-bgm" aria-label="BGM音楽を読み込む">🎵</button>
+    <button class="bgm-btn" id="btn-bgm" aria-label="BGM音楽を読み込む"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></button>
     <input type="file" id="bgm-input" accept="audio/*" style="display:none">
     <div class="bgm-indicator" id="bgm-indicator" style="display:none"></div>
   </div>
@@ -141,49 +143,37 @@
   <div class="how-to-box">
     撮影前に被写体を長押しして <strong>AE/AFロック</strong><br>
     脇を締めて、手だけでなく腰から <strong>スマホを動かす</strong><br>
-    <strong id="how-to-clips">4カット</strong> で撮影素材が完成
+    <strong id="how-to-clips">2シーン</strong> をつないで動画が完成
   </div>
 </div>
 
 <!-- カメラ/マイク権限エラーオーバーレイ -->
-<div id="cam-error-overlay" style="display:none;position:fixed;inset:0;z-index:5000;
-  background:rgba(0,0,0,0.95);flex-direction:column;align-items:center;
-  justify-content:center;gap:20px;padding:40px;text-align:center">
-  <div style="font-size:48px">🚫</div>
-  <div style="font-family:var(--font-hd);font-size:18px;color:#FF2D78;letter-spacing:0.1em">
-    カメラにアクセスできません
-  </div>
-  <div style="font-family:var(--font-ui);font-size:12px;color:rgba(255,255,255,0.5);line-height:1.9;max-width:280px" id="cam-error-msg">
-    カメラの使用が許可されていません。
-  </div>
-  <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:300px">
-    <div style="padding:12px 16px;border-radius:10px;background:rgba(255,255,255,0.05);
-      border:1px solid rgba(255,255,255,0.1);text-align:left">
-      <div style="font-family:var(--font-ui);font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.1em;margin-bottom:6px">iOS の場合</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.65);line-height:1.7">
-        設定 → Safari → カメラ → 許可
+<div id="cam-error-overlay" class="cam-error-overlay">
+  <div class="cam-error-card">
+    <div class="cam-error-mark" aria-hidden="true"></div>
+    <div class="cam-error-title">カメラにアクセスできません</div>
+    <div class="cam-error-desc" id="cam-error-msg">
+      カメラの使用が許可されていません。
+    </div>
+    <div class="cam-error-help">
+      <div class="cam-error-help-card">
+        <div class="cam-error-help-label">iOS の場合</div>
+        <div class="cam-error-help-txt">設定 → Safari → カメラ → 許可</div>
+      </div>
+      <div class="cam-error-help-card">
+        <div class="cam-error-help-label">Android の場合</div>
+        <div class="cam-error-help-txt">ブラウザのアドレスバー → 🔒 → カメラ → 許可</div>
       </div>
     </div>
-    <div style="padding:12px 16px;border-radius:10px;background:rgba(255,255,255,0.05);
-      border:1px solid rgba(255,255,255,0.1);text-align:left">
-      <div style="font-family:var(--font-ui);font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.1em;margin-bottom:6px">Android の場合</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.65);line-height:1.7">
-        ブラウザのアドレスバー → 🔒 → カメラ → 許可
-      </div>
-    </div>
+    <button class="btn-primary"
+      onclick="document.getElementById('cam-error-overlay').style.display='none';window.location.reload();">
+      再試行
+    </button>
+    <button class="btn-copy-url"
+      onclick="document.getElementById('cam-error-overlay').style.display='none';">
+      センサーのみで続ける
+    </button>
   </div>
-  <button onclick="document.getElementById('cam-error-overlay').style.display='none';window.location.reload();"
-    style="padding:14px 36px;border-radius:50px;background:linear-gradient(135deg,#00D4FF,#0066FF);
-    border:none;cursor:pointer;font-family:var(--font-hd);font-size:13px;font-weight:700;
-    color:#000;letter-spacing:0.12em">
-    再試行
-  </button>
-  <button onclick="document.getElementById('cam-error-overlay').style.display='none';"
-    style="padding:10px 20px;border-radius:50px;background:transparent;
-    border:1px solid rgba(255,255,255,0.15);cursor:pointer;
-    font-family:var(--font-ui);font-size:11px;color:rgba(255,255,255,0.4)">
-    センサーのみで続ける
-  </button>
 </div>
 
 <!-- ── 3. ビューファインダー ── -->
@@ -192,6 +182,18 @@
     <div class="vf-main" id="vf-main">
       <video id="cam" autoplay playsinline muted></video>
       <div class="vf-gradient"></div>
+
+      <!-- シーン間の準備オーバーレイ -->
+      <div class="shot-prepare-overlay" id="shot-prepare-overlay" aria-hidden="true">
+        <div class="shot-prepare-panel" role="dialog" aria-modal="true" aria-labelledby="shot-prepare-title">
+          <div class="shot-prepare-kicker" id="shot-prepare-kicker">SCENE 2 / 2</div>
+          <div class="shot-prepare-title" id="shot-prepare-title">次のシーンを準備</div>
+          <div class="shot-prepare-desc" id="shot-prepare-desc"></div>
+          <div class="shot-prepare-ready" id="shot-prepare-ready"></div>
+          <button class="btn-primary shot-prepare-start" id="btn-next-scene">START SCENE</button>
+          <button class="shot-prepare-cancel" id="btn-cancel-shoot">撮影をやめる</button>
+        </div>
+      </div>
 
       <div class="rec-indicator" id="rec-indicator"></div>
 
@@ -279,7 +281,7 @@
 
   <!-- サブアクション -->
   <button class="btn-copy-url" id="btn-copy-url">URLをコピー</button>
-  <button class="btn-install-pwa" id="btn-install-pwa">📱 ホーム画面に追加</button>
+  <button class="btn-install-pwa" id="btn-install-pwa">ホーム画面に追加</button>
 </div>
 
 <!-- デバッグパネル（7連打で表示） -->
@@ -290,7 +292,7 @@
   <div>フェーズ: <span id="dbg-phase">-</span></div>
   <div>録画:   <span id="dbg-rec">-</span></div>
   <div>センサー: <span id="dbg-sens">-</span></div>
-  <div>クリップ: <span id="dbg-clip">-</span></div>
+  <div>シーン: <span id="dbg-clip">-</span></div>
   <div style="margin-top:8px">
     感度: <input id="dbg-sensitivity" type="range" min="8" max="40" value="22" aria-label="シュット感度"
       style="width:120px;vertical-align:middle;accent-color:var(--c);margin-left:6px">
@@ -304,10 +306,10 @@
     </span>
   </div>
   <div style="margin-top:8px">
-    クリップ数:
+    シーン数:
     <span class="clips-badge" id="clips-badge">
-      <button onclick="window._setClips(2)" id="cb-2">2</button>
-      <button onclick="window._setClips(4)" id="cb-4" class="active">4</button>
+      <button onclick="window._setClips(2)" id="cb-2" class="active">2</button>
+      <button onclick="window._setClips(4)" id="cb-4">4</button>
       <button onclick="window._setClips(6)" id="cb-6">6</button>
     </span>
   </div>
