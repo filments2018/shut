@@ -1,8 +1,9 @@
 /**
- * camera.js — v5
+ * camera.js — v6
  * 修正: flip() 中に stop() が呼ばれる競合を _starting フラグで完全防止
  * 追加: setQuality() — 解像度プリセット（low/medium/high）
  * 追加: getConstraints() — 現在の制約を返す（デバッグ用）
+ * 追加: sampleLuminance() — COVER用の低負荷な暗転判定
  */
 
 const Camera = (() => {
@@ -12,6 +13,8 @@ const Camera = (() => {
   let _starting  = false;
   let _actualSettings = {};
   let _quality   = 'high'; // low | medium | high
+  let _sampleCanvas = null;
+  let _sampleCtx = null;
 
   // 解像度プリセット
   const QUALITY_MAP = {
@@ -117,6 +120,37 @@ const Camera = (() => {
     _stopTracks();
   }
 
+  /**
+   * 現在のカメラ映像を24x24へ縮小し、平均輝度と暗い画素の割合を返す。
+   * COVER判定中のみ約10fpsで呼ばれるため、録画負荷への影響を抑えられる。
+   */
+  function sampleLuminance() {
+    if (!_videoEl || !_stream || _videoEl.readyState < 2 || !_videoEl.videoWidth) return null;
+    if (!_sampleCanvas) {
+      _sampleCanvas = document.createElement('canvas');
+      _sampleCanvas.width = 24;
+      _sampleCanvas.height = 24;
+      _sampleCtx = _sampleCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    if (!_sampleCtx) return null;
+
+    try {
+      _sampleCtx.drawImage(_videoEl, 0, 0, 24, 24);
+      const pixels = _sampleCtx.getImageData(0, 0, 24, 24).data;
+      let total = 0;
+      let dark = 0;
+      const count = pixels.length / 4;
+      for (let i = 0; i < pixels.length; i += 4) {
+        const luma = pixels[i] * 0.2126 + pixels[i + 1] * 0.7152 + pixels[i + 2] * 0.0722;
+        total += luma;
+        if (luma <= 50) dark++;
+      }
+      return { luma: total / count, darkRatio: dark / count };
+    } catch (_) {
+      return null;
+    }
+  }
+
   function _stopTracks() {
     if (_stream) {
       _stream.getTracks().forEach(t => t.stop());
@@ -146,5 +180,6 @@ const Camera = (() => {
   return {
     start, stop, flip, setQuality, getQuality,
     getStream, isActive, isRear, isStarting, getFacingMode, getActualSettings,
+    sampleLuminance,
   };
 })();

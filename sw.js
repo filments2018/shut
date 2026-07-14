@@ -1,8 +1,8 @@
 /**
- * sw.js — v41
- * MATCH構図ゴーストを配信するためキャッシュ更新。
+ * sw.js — v42
+ * COVER自動暗転判定を配信するためキャッシュ更新。
  */
-const CACHE  = 'shut-v41';
+const CACHE  = 'shut-v42';
 const ASSETS = [
   '/',
   '/index.html',

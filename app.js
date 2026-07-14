@@ -50,8 +50,8 @@ const MODES = [
       { guide: 'GOで手をどけ、被写体を見せる', arrow: '✦', hud: 'SCENE B  REVEAL' },
     ],
     transition: {
-      label: 'COVER', arrow: '■', trigger: 'tap', tailMs: 180,
-      prompt: 'レンズを完全に塞いだら画面をタップ',
+      label: 'COVER', arrow: '■', trigger: 'dark', tailMs: 180,
+      prompt: 'レンズを完全に塞ぐと自動カット',
       prepare: '場所や衣装を変え、レンズを手で完全に塞げる状態にする。',
       ready: 'STARTを押したら、カウントダウン中にレンズを完全に塞ぐ。',
     },
@@ -119,6 +119,7 @@ const MODES = [
 // 実際のトランジション撮影単位: シーンA + シーンB
 // デバッグ時のみ URL?clips=4/6 で連続シーン数を増やせる。
 let CLIPS_NEEDED = 2;
+let _coverDetectTimer = null;
 
 // グローバル公開（ui.js の window.State 参照で使用）
 window.State = null;
@@ -152,6 +153,7 @@ function _T(fn, ms) {
 function _clearTimers() {
   State.timers.forEach(clearTimeout);
   State.timers = [];
+  _stopCoverDetection();
 }
 
 // ── 振り方向検出（加速度から↑↓←→を判定） ────────
@@ -193,6 +195,7 @@ document.addEventListener('visibilitychange', () => {
       Audio.stop();
     }
     Motion.setActive(false);
+    _stopCoverDetection();
     // 録画中なら一時停止（データ破損防止）
     if (State.recEnabled && Recorder.isRecording()) {
       Recorder.pauseClip();
@@ -215,7 +218,9 @@ document.addEventListener('visibilitychange', () => {
     }
     // シャッター待機中に戻ったならセンサーを再有効化
     if (State.phase === 'shutter') {
-      Motion.setActive(true);
+      var transition = _getTransition();
+      Motion.setActive(transition.trigger === 'motion');
+      if (transition.trigger === 'dark') _startCoverDetection();
     }
   }
 });
@@ -515,6 +520,7 @@ function gotoRecording() {
   _clearTimers();
   State.phase = 'recording';
   Motion.setActive(false);
+  UI.setMotionGaugeMode('motion');
   UI.showMatchGuide(false);
   _checkOrientation();
 
@@ -591,13 +597,19 @@ function gotoShutter() {
     arrow: transition.arrow,
     sub: transition.prompt,
   });
-  UI.setGuideText(transition.prompt, false);
-  UI.setHudStatus('<strong>TRANSITION NOW</strong> &nbsp; 動作したらタップ');
+  UI.setGuideText(transition.trigger === 'dark'
+    ? '右のDARKメーターが満タンになるまで塞ぐ'
+    : transition.prompt, false);
+  UI.setHudStatus(transition.trigger === 'dark'
+    ? '<strong>AUTO DETECT</strong> &nbsp; レンズを完全に塞ぐ'
+    : '<strong>TRANSITION NOW</strong> &nbsp; 動作したらタップ');
   UI.updateRemainingClips(CLIPS_NEEDED - State.clips, CLIPS_NEEDED);
   _vibrate(15);
 
   Motion.setActive(transition.trigger === 'motion');
   Motion.resetCooldown();
+  UI.setMotionGaugeMode(transition.trigger === 'dark' ? 'dark' : 'motion');
+  if (transition.trigger === 'dark') _startCoverDetection();
 
   // 待ち時間も録画されるため4秒で打ち切り、次シーン準備へ進める。
   UI.startShutterCountdown(4, () => {
@@ -605,6 +617,7 @@ function gotoShutter() {
     State.transitionCommitted = true;
     State.phase = 'processing';
     Motion.setActive(false);
+    _stopCoverDetection();
     State.scores.push({ grade: 'MISS', offset: null, timeout: true });
     State.combo = 0;
     UI.showGradePopup('MISS', 0);
@@ -618,18 +631,19 @@ function gotoShutter() {
   });
 }
 
-function executeShut() {
+function executeShut(source) {
   if (State.phase !== 'shutter' || State.transitionCommitted) return;
   State.transitionCommitted = true;
   State.phase = 'executing';
   Motion.setActive(false);
+  _stopCoverDetection();
   UI.cancelShutterCountdown();
   _captureMatchGuide();
 
   // ── タイミング評価 ──────────────────────────────
   const offset = Audio.getTimingOffset(); // ビートとのズレ(ms)
   const grade  = _calcGrade(offset);
-  State.scores.push({ grade: grade, offset: offset });
+  State.scores.push({ grade: grade, offset: offset, autoDetected: source === 'dark' });
 
   // コンボ更新
   if (grade === 'PERFECT' || grade === 'GOOD') {
@@ -671,6 +685,57 @@ function executeShut() {
     State.clips++;
     gotoPrepareNext();
   }, transition.tailMs || 220);
+}
+
+function _startCoverDetection() {
+  _stopCoverDetection();
+  if (State.phase !== 'shutter' || !Camera.isActive()) return;
+
+  let baseline = 0;
+  let baselineSamples = 0;
+  let darkFrames = 0;
+
+  const sample = () => {
+    if (State.phase !== 'shutter' || State.transitionCommitted) {
+      _stopCoverDetection();
+      return;
+    }
+
+    const reading = Camera.sampleLuminance();
+    if (reading) {
+      if (baselineSamples < 3) {
+        baseline = Math.max(baseline, reading.luma);
+        baselineSamples++;
+        UI.updateCoverGauge(0, false);
+      } else {
+        const threshold = Math.min(42, Math.max(8, baseline * 0.28));
+        const range = Math.max(1, baseline - threshold);
+        const isCovered = reading.luma <= threshold && reading.darkRatio >= 0.82;
+        let darkness = Math.max(0, Math.min(1, (baseline - reading.luma) / range));
+        if (isCovered && baseline <= threshold) darkness = 1;
+        darkFrames = isCovered ? darkFrames + 1 : 0;
+        UI.updateCoverGauge(darkness, darkFrames > 0);
+
+        if (darkFrames >= 3) {
+          UI.setHudStatus('<strong>DARK DETECTED</strong> &nbsp; 暗転を確定');
+          _vibrate([30, 20, 60]);
+          executeShut('dark');
+          return;
+        }
+      }
+    }
+
+    _coverDetectTimer = setTimeout(sample, 100);
+  };
+
+  sample();
+}
+
+function _stopCoverDetection() {
+  if (_coverDetectTimer) {
+    clearTimeout(_coverDetectTimer);
+    _coverDetectTimer = null;
+  }
 }
 
 function _getTransition() {

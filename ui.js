@@ -721,10 +721,32 @@ const UI = (() => {
 
   // ── 加速度ゲージ ───────────────────────────────
   function updateMotionGauge(mag, isWarn) {
+    const wrap = document.querySelector('.motion-gauge-wrap');
+    if (wrap && wrap.classList.contains('cover-mode')) return;
     const fill = $('motion-gauge-fill');
     if (!fill) return;
     fill.style.height = Math.min(mag / 28 * 100, 100) + '%';
     fill.classList.toggle('over', isWarn);
+  }
+
+  function setMotionGaugeMode(mode) {
+    const wrap = document.querySelector('.motion-gauge-wrap');
+    const label = document.querySelector('.motion-gauge-label');
+    const fill = $('motion-gauge-fill');
+    const isDark = mode === 'dark';
+    if (wrap) wrap.classList.toggle('cover-mode', isDark);
+    if (label) label.textContent = isDark ? 'DARK' : 'G';
+    if (fill) {
+      fill.style.height = '0%';
+      fill.classList.remove('over', 'cover-ready');
+    }
+  }
+
+  function updateCoverGauge(darkness, detecting) {
+    const fill = $('motion-gauge-fill');
+    if (!fill) return;
+    fill.style.height = Math.round(Math.max(0, Math.min(1, darkness)) * 100) + '%';
+    fill.classList.toggle('cover-ready', !!detecting);
   }
 
   // ── トースト ───────────────────────────────────
@@ -1323,7 +1345,7 @@ const UI = (() => {
     addFlash, addBlurSwipe, showGradePopup, dismissGradePopup,
     showCamPreviewHint, showDummyBackground, hideDummyBackground,
     showRecIndicator, hideRecIndicator,
-    updateMotionGauge,
+    updateMotionGauge, setMotionGaugeMode, updateCoverGauge,
     showToast,
     buildCompleteScreen,
     cleanupPreview: _cleanupPreview,

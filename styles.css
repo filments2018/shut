@@ -865,7 +865,7 @@ html, body {
 .shut-sub {
   font-family: var(--font-ui); font-size: 12px; font-weight: 500; letter-spacing: 0.04em;
   color: rgba(var(--stage-ink-rgb), 0.7);
-  white-space: nowrap;
+  width: min(240px, 72vw); text-align: center; white-space: normal;
 }
 /* WHIP 4方向表示 */
 .whip-any-arrows {
@@ -941,6 +941,16 @@ html, body {
   will-change: height;
 }
 .motion-gauge-fill.over { background: var(--color-coral); animation: gaugeOverPulse 0.3s ease-in-out; }
+.motion-gauge-wrap.cover-mode { padding-inline: 8px; }
+.motion-gauge-wrap.cover-mode .motion-gauge-label {
+  color: rgba(var(--stage-ink-rgb), 0.72);
+  writing-mode: vertical-rl;
+}
+.motion-gauge-wrap.cover-mode .motion-gauge-fill { background: var(--accent); }
+.motion-gauge-wrap.cover-mode .motion-gauge-fill.cover-ready {
+  background: var(--color-coral);
+  box-shadow: 0 0 10px rgba(var(--color-coral-rgb), 0.65);
+}
 @keyframes gaugeOverPulse {
   0%   { transform: scaleX(1); }
   50%  { transform: scaleX(1.4); }

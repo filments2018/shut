@@ -1,6 +1,6 @@
 # SHUT — スマホ撮影レシピ 仕様書
 
-> Version: v41 | Updated: 2026-07-15
+> Version: v42 | Updated: 2026-07-15
 
 ---
 
@@ -124,7 +124,7 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
   transition: {
     label: 'WHIP',
     arrow: 'any',
-    trigger: 'motion',    // motion または tap
+    trigger: 'motion',    // motion / tap / dark
     tailMs: 260,          // 動作後に録画へ残す余韻
     prompt: '好きな方向へ、すぐに振り切る',
     prepare: '次の場所へ移動し、同じ方向から構える。',
@@ -207,6 +207,7 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 - `ideal` 制約で要求、失敗時は制約緩和で再試行
 - フロントカメラはCSS `scaleX(-1)` でミラー表示
 - フリップは `processing`/`shutter` 中はブロック
+- COVERの待機中だけ映像を24x24へ縮小し、平均輝度と暗い画素率を低負荷で計測
 
 ### 6.5 recorder.js — 録画
 
@@ -235,6 +236,7 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 - `showGradePopup()` → PERFECT/GOOD/OK/MISS のフローティング評価表示
 - MATCHではシーンAのタップ瞬間をCanvasへ保持し、シーンB準備・カウントダウン中に半透明の構図ゴーストとして表示
 - 構図ゴーストは画面表示のみで、MediaRecorderの完成動画には合成しない
+- COVERは開始時の明るさを基準に暗転を3回連続検出すると自動確定し、タップ操作もフォールバックとして残す
 
 ---
 
@@ -247,7 +249,7 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 
 ### Service Worker (sw.js)
 - 戦略: Stale-While-Revalidate
-- キャッシュ名: `shut-v41`（手動バージョニング）
+- キャッシュ名: `shut-v42`（手動バージョニング）
 - `e.waitUntil(fetchPromise)` でバックグラウンド更新を保護
 - オフラインフォールバック: `index.html`
 
