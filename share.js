@@ -101,7 +101,7 @@ const Share = (() => {
 
   /**
    * 複数クリップを個別にダウンロード
-   * (FFmpeg.wasm なし環境での代替)
+   * 外部の動画変換ライブラリを使わない環境での代替
    */
   function downloadClips(clips, meta) {
     if (!clips || clips.length === 0) return;

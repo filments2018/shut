@@ -248,21 +248,101 @@ const UI = (() => {
     });
   }
 
+  function setCaptureAudio(enabled) {
+    document.querySelectorAll('[data-capture-audio]').forEach(btn => {
+      const active = (btn.dataset.captureAudio === 'on') === !!enabled;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+
+  function setCompositionGrid(enabled) {
+    const grid = $('composition-grid');
+    const btn = $('btn-grid-guide');
+    if (grid) {
+      grid.classList.toggle('on', !!enabled);
+      grid.setAttribute('aria-hidden', enabled ? 'false' : 'true');
+    }
+    if (btn) {
+      btn.classList.toggle('active', !!enabled);
+      btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+      btn.setAttribute('aria-label', enabled ? '3分割構図ガイドを非表示' : '3分割構図ガイドを表示');
+    }
+  }
+
+  function renderDeviceCheck(report) {
+    const root = $('device-check');
+    const result = $('device-check-result');
+    const message = $('device-check-message');
+    const list = $('device-check-list');
+    if (!root || !report) return;
+    root.dataset.state = report.state || 'checking';
+    if (result) result.textContent = report.headline || '確認中...';
+    if (message) message.textContent = report.message || '';
+    if (!list) return;
+    list.innerHTML = '';
+    (report.items || []).forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'device-check-item';
+      row.dataset.status = item.status || 'neutral';
+
+      const copy = document.createElement('span');
+      copy.className = 'device-check-item-copy';
+      const name = document.createElement('span');
+      name.className = 'device-check-item-name';
+      name.textContent = item.name || '';
+      const detail = document.createElement('span');
+      detail.className = 'device-check-item-detail';
+      detail.textContent = item.detail || '';
+      copy.append(name, detail);
+
+      const badge = document.createElement('span');
+      badge.className = 'device-check-badge';
+      badge.textContent = item.badge || '';
+      row.append(copy, badge);
+      list.appendChild(row);
+    });
+  }
+
+  function setDeviceCheckExpanded(expanded) {
+    const btn = $('btn-device-check');
+    const details = $('device-check-details');
+    if (!btn || !details) return;
+    btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    details.hidden = !expanded;
+  }
+
   function showPrepareNext(data) {
     const overlay = $('shot-prepare-overlay');
     if (!overlay) return;
     const kicker = $('shot-prepare-kicker');
     const title = $('shot-prepare-title');
     const flow = $('shot-prepare-flow');
+    const recordingState = $('shot-recording-state-text');
+    const frame = $('shot-prepare-frame');
+    const frameImg = $('shot-prepare-frame-img');
+    const frameLabel = $('shot-prepare-frame-label');
     const desc = $('shot-prepare-desc');
     const ready = $('shot-prepare-ready');
     if (kicker) kicker.textContent = 'SCENE ' + data.scene + ' / ' + data.total;
     if (title) title.textContent = data.title || '次のシーンを準備';
     if (flow) flow.textContent = data.flowLabel || 'MOVE & RESUME';
+    if (recordingState) recordingState.textContent = data.recordingState || '録画停止中';
+    if (frame && frameImg) {
+      frame.hidden = !data.checkFrame;
+      if (data.checkFrame) {
+        frameImg.src = data.checkFrame;
+        frameImg.alt = data.checkFrameAlt || '撮影シーンの確認フレーム';
+      }
+      else frameImg.removeAttribute('src');
+    }
+    if (frameLabel) frameLabel.textContent = data.checkFrameLabel || 'SCENE A CHECK';
     if (desc) desc.textContent = data.description || '';
     if (ready) ready.textContent = data.ready || '';
     const btn = $('btn-next-scene');
     if (btn) btn.textContent = data.buttonLabel || 'START SCENE';
+    const retakeBtn = $('btn-retake-scene');
+    if (retakeBtn) retakeBtn.textContent = data.retakeLabel || 'シーンAを撮り直す';
     overlay.classList.toggle('continuous-mode', !!data.autoResume);
     overlay.style.setProperty('--resume-ms', (data.resumeMs || 2200) + 'ms');
     overlay.classList.toggle('with-match-guide', !!data.matchGuide);
@@ -278,6 +358,18 @@ const UI = (() => {
     overlay.classList.remove('with-match-guide');
     overlay.classList.remove('continuous-mode');
     overlay.setAttribute('aria-hidden', 'true');
+  }
+
+  function setPrepareManualResume(message) {
+    const overlay = $('shot-prepare-overlay');
+    const state = $('shot-recording-state-text');
+    const ready = $('shot-prepare-ready');
+    const btn = $('btn-next-scene');
+    if (!overlay || !overlay.classList.contains('show')) return;
+    overlay.classList.remove('continuous-mode');
+    if (state) state.textContent = '録画停止中・再開待ち';
+    if (ready) ready.textContent = message || '画面に戻りました。準備できたら再開してください。';
+    if (btn) btn.textContent = '準備できたら撮影再開';
   }
 
   // ── MATCH 構図ゴースト ─────────────────────────
@@ -334,8 +426,10 @@ const UI = (() => {
     const wrap = $('match-guide');
     if (!wrap) return false;
     const visible = !!show && _hasMatchGuide;
+    const compositionGrid = $('composition-grid');
     wrap.classList.toggle('show', visible);
     wrap.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    if (compositionGrid) compositionGrid.classList.toggle('match-hidden', visible);
     return visible;
   }
 
@@ -708,10 +802,10 @@ const UI = (() => {
     if (old) old.remove();
     const el = document.createElement('div');
     el.className = 'cam-preview-hint';
-    el.textContent = '構図を確認してください';
+    el.textContent = '構図・明るさ・ピントを確認';
     main.appendChild(el);
     // アニメーション後に自動削除（_pulseTimers で管理）
-    _pulseTimeout(() => { if (el.parentNode) el.remove(); }, 900);
+    _pulseTimeout(() => { if (el.parentNode) el.remove(); }, 1450);
   }
 
   function hideDummyBackground() {
@@ -1002,8 +1096,40 @@ const UI = (() => {
   }
 
   // ── 完成画面 ───────────────────────────────────
+  function _buildSceneChecks(frames) {
+    const container = $('scene-checks');
+    if (!container) return;
+    container.innerHTML = '';
+    const available = (frames || []).filter(Boolean);
+    if (!available.length) {
+      container.style.display = 'none';
+      return;
+    }
+
+    (frames || []).forEach((frame, index) => {
+      if (!frame) return;
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'scene-check-item';
+      item.setAttribute('aria-label', 'シーン' + (index + 1) + 'の確認フレームを拡大');
+      item.innerHTML =
+        '<img src="' + frame + '" alt="シーン' + (index + 1) + 'の確認フレーム">' +
+        '<span>SCENE ' + (index + 1) + '</span>';
+      item.addEventListener('click', () => {
+        const expanded = item.classList.toggle('expanded');
+        container.querySelectorAll('.scene-check-item').forEach(other => {
+          if (other !== item) other.classList.remove('expanded');
+        });
+        item.setAttribute('aria-label', 'シーン' + (index + 1) + (expanded ? 'を縮小' : 'の確認フレームを拡大'));
+      });
+      container.appendChild(item);
+    });
+    container.style.display = 'grid';
+  }
+
   function buildCompleteScreen(mode, totalClips, previewBlob, shootTime, scoreData) {
     const recordingError = !!(scoreData && scoreData.recordingError);
+    _buildSceneChecks(scoreData && scoreData.sceneFrames ? scoreData.sceneFrames : []);
     // 前回のスコアパネルをリセット（2周目対応）
     var prevPanel = $('score-panel');
     if (prevPanel) {
@@ -1103,7 +1229,8 @@ const UI = (() => {
       meta.innerHTML =
         '<div class="complete-flavor">' + flavor + '</div>' +
         '<div class="complete-stats">' +
-        mode.label + ' RECIPE  ·  ' + totalClips + ' SCENES  ·  約' + totalSec + '秒' +
+        mode.label + ' RECIPE  ·  ' + totalClips + ' SCENES  ·  約' + totalSec + '秒  ·  ' +
+        (scoreData && scoreData.audioRecorded ? '音声あり' : '音声なし') +
         (tsStr ? '  ·  ' + tsStr : '') +
         '</div>' +
         (recordingError ? '' : '<div class="complete-hashtags" title="タップでコピー">' + hashtags + '</div>');
@@ -1350,7 +1477,9 @@ const UI = (() => {
     updateRemainingClips,
     showFlipBtn, hideFlipBtn,
     setCenter, setGuideText, setHudStatus,
-    setShootFlow, showPrepareNext, hidePrepareNext,
+    setShootFlow, setCaptureAudio, setCompositionGrid,
+    renderDeviceCheck, setDeviceCheckExpanded,
+    showPrepareNext, hidePrepareNext, setPrepareManualResume,
     captureMatchGuide, showMatchGuide, clearMatchGuide, hasMatchGuide,
     beatPulse, stopViz, updateVizBpm,
     startShutterCountdown, cancelShutterCountdown,

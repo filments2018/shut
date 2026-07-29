@@ -1,6 +1,6 @@
 # SHUT — スマホ撮影レシピ 仕様書
 
-> Version: v43 | Updated: 2026-07-15
+> Version: v49 | Updated: 2026-07-29
 
 ---
 
@@ -11,7 +11,13 @@
 ### コアコンセプト
 - **レシピ選択 → シーンA → トランジション → シーンB** の撮影フロー
 - 同じ場所で自動再開する「連続撮影」と、移動後に任意で再開する「移動撮影」を選択可能
+- 収録音声のあり／なしを撮影前に選択可能
 - シーン間の移動・着替え・構図準備は完成動画から自動で除外
+- 移動待機中は録画停止状態を明示し、Screen Wake Lockで画面スリープを抑制
+- シーンごとの確認フレームを保存し、シーンAは準備画面から撮り直し可能
+- シーンB終了後は録画を一時停止して最終構図を確認し、完成またはレシピ全体の撮り直しを選択可能
+- 映像に焼き込まれない3分割構図ガイドをカメラ画面で切り替え可能
+- レシピ選択前にカメラ・録画形式・シーン切替・センサー・音声・画面スリープ防止の対応状況を確認可能
 - BPM（テンポ）に合わせたビートガイドでリズミカルに撮影
 - 加速度センサーまたは画面タップでトランジション動作を確定
 - タイミング精度をスコア評価（PERFECT / GOOD / OK / MISS）
@@ -53,6 +59,7 @@ shut/
   camera.js          -- カメラ制御（~150行）
   recorder.js        -- MediaRecorder管理（~220行）
   share.js           -- シェア・ダウンロード（~140行）
+  diagnostics.js     -- 端末内診断ログ・レポートコピー
   sw.js              -- Service Worker（~80行）
   manifest.json      -- PWAマニフェスト
   netlify.toml       -- Netlify設定（ヘッダー・リダイレクト）
@@ -66,9 +73,9 @@ shut/
 ## 4. 画面フロー（ステートマシン）
 
 ```
-splash → [iOS] permission → [初回] tutorial → select → countdown → recording(A) → shutter
-                                                  ↑                              ↓
-                                                  └────── complete ← recording(B) ← prepare
+splash → [iOS] permission → [初回] tutorial → select → preview → countdown → recording(A) → shutter
+                                                            ↑                              ↓
+                                                            └─ complete ← final-review ← recording(B) ← prepare
 ```
 
 ### フェーズ一覧
@@ -78,13 +85,15 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 | `splash` | ロゴ表示（0.7-1.2s） | `permission` or `tutorial` or `select` |
 | `permission` | iOS センサー許可画面 | `tutorial` or `select` |
 | `tutorial` | 初回チュートリアル（3ステップ） | `select` |
-| `select` | レシピ（モード）選択 | `countdown`（via `startMode`） |
+| `select` | レシピ（モード）選択 | `preview`（via `startMode`） |
+| `preview` | カメラ起動・構図確認 | `countdown` |
 | `countdown` | 3→2→1→GO! カウントダウン | `recording` |
-| `recording` | シーンA/Bを録画中（BPM同期） | Aは`shutter`、Bは`complete` |
+| `recording` | シーンA/Bを録画中（BPM同期） | Aは`shutter`、Bは`final-review` |
 | `shutter` | トランジション動作の検出・タップ待機 | `executing` or `prepare` |
 | `executing` | 動作の余韻を録画して一時停止 | `prepare` |
 | `processing` | タイムアウト時などの遷移処理 | `prepare` |
 | `prepare` | 録画を一時停止し、場所・衣装・構図を準備 | `countdown` |
+| `final-review` | シーンBの最終構図を確認 | `complete` または `preview`（全体を撮り直し） |
 | `complete` | 完成画面（スコア・プレビュー・シェア） | `select`（リトライ） |
 
 ### 撮影スタイル
@@ -95,6 +104,23 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 | `travel` | 録画を一時停止したまま無期限待機。「準備できたら撮影再開」でカウントダウンを開始 | 場所・衣装・構図を変える撮影 |
 
 選択値は `localStorage` の `shut_shoot_flow` に保存し、次回起動時にも引き継ぐ。初期値は `travel`。
+
+### 実機撮影支援
+
+- 撮影開始から完成・中止まで `navigator.wakeLock` を要求し、バックグラウンド復帰時に再取得する
+- カメラ起動直後・カウントダウン・録画・トランジション待機中にアプリがバックグラウンドへ移動した場合は処理を一時停止し、ユーザー操作後に再開する
+- 録画中断時は残り撮影時間を保持し、復帰後のカウントダウンを経て続きから収録する
+- `MediaRecorder.pause()` 非対応端末では部分録画を破棄し、同じレシピを最初から撮り直す
+- 連続撮影の準備中にバックグラウンドへ移動した場合は自動再開を解除し、任意再開へ切り替える
+- 移動撮影の `prepare` では「録画停止中・移動できます」と表示する
+- 連続撮影の `prepare` では「録画停止中・まもなく再開」と表示する
+- 音声設定は `localStorage` の `shut_capture_audio` に保存し、初期値は音声あり
+- シーン終端で 270x480 JPEG の確認フレームを生成し、完成画面にシーン別表示する
+- シーンA準備中の撮り直しは、未完成のRecorderとカメラを破棄して同じレシピを先頭から再開する
+- カメラ起動後の `preview` は3秒間維持し、フロント／リア切替後はタイマーをリセットして構図確認時間を取り直す
+- Webカメラで保証できないAE/AFロック操作は案内せず、構図・明るさ・ピントが安定してから撮影するよう案内する
+- 3分割構図ガイドの設定を端末に保存し、MATCHの構図ゴースト表示中は補助線を自動で隠す
+- 端末チェックは権限ダイアログを表示せず、取得済み権限とブラウザAPIの対応状況だけを判定する
 
 ---
 
@@ -162,6 +188,8 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
   clips: 0,              // 撮影済みシーン数
   recEnabled: false,     // MediaRecorder が有効か
   shootFlow: 'travel',   // 'continuous' | 'travel'
+  captureAudio: true,    // マイク音声を動画へ含めるか
+  sceneFrames: [],       // シーン終端のJPEG data URL
   scores: [],            // 各トランジションの {grade, offset}
   combo: 0,              // 連続 GOOD 以上
   maxCombo: 0,           // 最大コンボ
@@ -170,6 +198,13 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
   _cachedBlob: null,     // 完成動画 Blob のキャッシュ
 }
 ```
+
+### 6.2 diagnostics.js — 端末内診断ログ
+
+- 最大40件を `shut_diagnostics_v1` に保存
+- 記録対象は時刻、レベル、コード、フェーズ、モード、撮影設定
+- 映像、音声、デバイス名、権限情報の実値は保存しない
+- 完成画面またはカメラエラー画面からJSONレポートをコピー可能
 
 **タイミング評価グレード**
 - BPM 依存の窓設定（拍間隔の比率）
@@ -185,7 +220,7 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 | ratio ≥ 0.4 | NICE TRY! | 2 |
 | その他 | KEEP RHYTHM! | 1 |
 
-### 6.2 audio.js — Web Audio API
+### 6.3 audio.js — Web Audio API
 
 **ビートスケジューラ**
 - Lookahead: 150ms / Schedule interval: 50ms
@@ -204,7 +239,7 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 - `freezeForTiming()` → ビート停止だが _nextBeat/_bpm を保持
 - `getTimingOffset()` → 直近のビートとのズレ(ms) を返す
 
-### 6.3 motion.js — 加速度センサー
+### 6.4 motion.js — 加速度センサー
 
 - ハイパスフィルタ（α=0.85）で重力成分を除去
 - ローパスフィルタ（α=0.4）でゲージ表示用平滑化
@@ -212,7 +247,7 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 - クールダウン: 750ms
 - シュット方向を記録（ブラーエフェクトの方向決定に使用）
 
-### 6.4 camera.js — カメラ制御
+### 6.5 camera.js — カメラ制御
 
 - 解像度プリセット: low(480p) / medium(720p) / high(1080p)
 - `ideal` 制約で要求、失敗時は制約緩和で再試行
@@ -220,7 +255,7 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 - フリップは `processing`/`shutter` 中はブロック
 - COVERの待機中だけ映像を24x24へ縮小し、平均輝度と暗い画素率を低負荷で計測
 
-### 6.5 recorder.js — 録画
+### 6.6 recorder.js — 録画
 
 - モバイル: H.264/MP4 優先（ハードウェアエンコード）
 - デスクトップ: VP9/WebM 優先
@@ -233,13 +268,13 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 - 保存失敗時は完成演出を行わず、権限確認と再撮影を案内する
 - マイクストリームは一度取得したら再利用
 
-### 6.6 share.js — 共有
+### 6.7 share.js — 共有
 
 1. Web Share API (files) → ファイル付きシェア
 2. Web Share API (URL) → URL のみシェア
 3. フォールバック → Blob ダウンロード
 
-### 6.7 ui.js — UI管理
+### 6.8 ui.js — UI管理
 
 - `showScreen(name)` → aria-hidden 連動
 - `buildCompleteScreen()` → スコアパネル、タイミングチャート、パーティクル
@@ -260,7 +295,7 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 
 ### Service Worker (sw.js)
 - 戦略: Stale-While-Revalidate
-- キャッシュ名: `shut-v42`（手動バージョニング）
+- キャッシュ名: `shut-v49`（手動バージョニング）
 - `e.waitUntil(fetchPromise)` でバックグラウンド更新を保護
 - オフラインフォールバック: `index.html`
 
@@ -339,6 +374,10 @@ splash → [iOS] permission → [初回] tutorial → select → countdown → r
 | `shut_last_mode` | 最後に使用したレシピID |
 | `shut_onboarded` | チュートリアル完了フラグ (`"1"`) |
 | `shut_hi_{modeId}` | モード別ハイスコア（星数） |
+| `shut_shoot_flow` | 撮影スタイル (`continuous` / `travel`) |
+| `shut_capture_audio` | 収録音声設定 (`on` / `off`) |
+| `shut_composition_grid` | 3分割構図ガイド設定 (`on` / `off`) |
+| `shut_diagnostics_v1` | 端末内診断ログ（最大40件） |
 
 ---
 

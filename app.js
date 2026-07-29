@@ -121,6 +121,11 @@ const MODES = [
 let CLIPS_NEEDED = 2;
 let _coverDetectTimer = null;
 const CONTINUOUS_RESUME_MS = 2200;
+const PREVIEW_READY_MS = 3000;
+let _wakeLock = null;
+let _wakeLockPending = false;
+let _wakeLockRequestId = 0;
+let _deviceCheckRequestId = 0;
 
 // グローバル公開（ui.js の window.State 参照で使用）
 window.State = null;
@@ -133,6 +138,14 @@ const State = window.State = {
   debugTaps:   0,
   sensitivity: 22,
   shootFlow:   'travel', // 'continuous' | 'travel'
+  captureAudio: true,
+  compositionGrid: false,
+  sceneFrames: [],
+  interruptedPhase: null,
+  interruptionNeedsRestart: false,
+  recordingStartedAt: 0,
+  recordingDurationMs: 0,
+  resumeDurationMs: 0,
   // スコアシステム
   scores:      [],    // 各クリップのタイミング評価 {grade, offset}
   combo:       0,     // 連続GOOD以上の数
@@ -141,6 +154,18 @@ const State = window.State = {
   lastWhipDir: null,  // '→' | '←' | '↑' | '↓'
   transitionCommitted: false,
 };
+
+if (typeof Diagnostics !== 'undefined') {
+  Diagnostics.setContextProvider(() => ({
+    phase: State.phase,
+    mode: State.mode ? State.mode.id : null,
+    scene: State.clips + 1,
+    shootFlow: State.shootFlow,
+    captureAudio: State.captureAudio,
+    compositionGrid: State.compositionGrid,
+    recorderMime: typeof Recorder !== 'undefined' ? Recorder.getMime() : '',
+  }));
+}
 
 function _T(fn, ms) {
   var id = setTimeout(function() {
@@ -178,6 +203,39 @@ function _vibrate(pattern) {
   }
 }
 
+async function _requestWakeLock() {
+  if (!('wakeLock' in navigator) || document.hidden || _wakeLock || _wakeLockPending) return false;
+  const requestId = ++_wakeLockRequestId;
+  _wakeLockPending = true;
+  try {
+    const lock = await navigator.wakeLock.request('screen');
+    _wakeLockPending = false;
+    if (requestId !== _wakeLockRequestId || !State.mode) {
+      try { await lock.release(); } catch (_) {}
+      return false;
+    }
+    _wakeLock = lock;
+    lock.addEventListener('release', () => {
+      if (_wakeLock === lock) _wakeLock = null;
+    });
+    if (typeof Diagnostics !== 'undefined') Diagnostics.log('info', 'wake_lock_acquired');
+    return true;
+  } catch (error) {
+    _wakeLockPending = false;
+    if (typeof Diagnostics !== 'undefined') Diagnostics.log('warn', 'wake_lock_failed', error.message);
+    return false;
+  }
+}
+
+async function _releaseWakeLock() {
+  _wakeLockRequestId++;
+  _wakeLockPending = false;
+  if (!_wakeLock) return;
+  const lock = _wakeLock;
+  _wakeLock = null;
+  try { await lock.release(); } catch (_) {}
+}
+
 // ── Service Worker ────────────────────────────────
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -198,31 +256,71 @@ document.addEventListener('visibilitychange', () => {
     }
     Motion.setActive(false);
     _stopCoverDetection();
-    // 録画中なら一時停止（データ破損防止）
-    if (State.recEnabled && Recorder.isRecording()) {
-      Recorder.pauseClip();
+    const interruptedPhase = State.phase;
+    const requiresConfirmation = ['preview', 'countdown', 'recording', 'shutter'].includes(interruptedPhase);
+
+    if (interruptedPhase === 'recording') {
+      const elapsed = Math.max(0, performance.now() - State.recordingStartedAt);
+      State.resumeDurationMs = Math.max(500, State.recordingDurationMs - elapsed);
     }
+
+    let paused = true;
+    if (State.recEnabled && Recorder.isRecording()) {
+      paused = Recorder.pauseClip();
+      if (!paused && Recorder.isRecording()) {
+        State.interruptionNeedsRestart = true;
+        Recorder.stopClip().catch(() => {});
+      }
+    }
+
+    if (requiresConfirmation) {
+      _clearTimers();
+      UI.stopRecBar();
+      UI.hideRecIndicator();
+      UI.cancelShutterCountdown();
+      State.interruptedPhase = interruptedPhase;
+      State.phase = 'interrupted';
+      const needsRestart = State.interruptionNeedsRestart;
+      const isShutter = interruptedPhase === 'shutter';
+      const isPreview = interruptedPhase === 'preview';
+      UI.showPrepareNext({
+        scene: State.clips + 1,
+        total: CLIPS_NEEDED,
+        title: needsRestart ? '撮影を最初からやり直します' : '撮影を一時停止しました',
+        description: needsRestart
+          ? 'この端末では録画を安全に一時停止できません。部分録画は使わず、同じレシピを最初から撮影します。'
+          : isPreview
+            ? 'カメラ準備を停止しました。構図を確認してから撮影を始めてください。'
+          : isShutter
+            ? 'トランジション待機を停止しています。構え直してから再開してください。'
+            : '録画とカウントダウンを停止しています。構え直してから再開してください。',
+        ready: 'ボタンを押すまで録画は再開しません。',
+        flowLabel: 'INTERRUPTED',
+        buttonLabel: needsRestart
+          ? '最初から撮り直す'
+          : isPreview ? 'カメラ準備を再開'
+          : isShutter ? 'トランジション待機に戻る' : 'カウントダウンから再開',
+        recordingState: needsRestart
+          ? '録画停止・撮り直しが必要'
+          : isPreview ? '撮影開始前・再開待ち' : '録画一時停止中',
+        checkFrame: State.clips > 0 ? State.sceneFrames[State.clips - 1] : null,
+        retakeLabel: '最初から撮り直す',
+        autoResume: false,
+        matchGuide: State.mode && State.mode.id === 'match' && UI.hasMatchGuide(),
+      });
+      if (typeof Diagnostics !== 'undefined') {
+        Diagnostics.log('warn', 'capture_interrupted', { phase: interruptedPhase, paused: paused });
+      }
+    } else if (interruptedPhase === 'prepare' && State.shootFlow === 'continuous') {
+      _clearTimers();
+      UI.setPrepareManualResume('バックグラウンド移動のため自動再開を止めました。準備できたら再開してください。');
+    }
+    _releaseWakeLock();
   } else {
     // フォアグラウンド復帰 — iOS AudioContext の suspend 対策
     Audio.unlock();
-    if (State.phase === 'recording' && State.mode) {
-      if (State.recEnabled && Recorder.isPaused()) {
-        // 一時停止中: resume してから録画を再開（stopClipでデータ消失しない）
-        Recorder.resumeClip();
-        Audio.start(State.mode.bpm, idx => UI.beatPulse(idx));
-      } else if (State.recEnabled && !Recorder.isRecording()) {
-        // 録画が完全に停止 → シャッター待機へ
-        gotoShutter();
-      } else {
-        // 録画バーがまだ動いている → ビートだけ再開
-        Audio.start(State.mode.bpm, idx => UI.beatPulse(idx));
-      }
-    }
-    // シャッター待機中に戻ったならセンサーを再有効化
-    if (State.phase === 'shutter') {
-      var transition = _getTransition();
-      Motion.setActive(transition.trigger === 'motion');
-      if (transition.trigger === 'dark') _startCoverDetection();
+    if (['interrupted', 'executing', 'processing', 'prepare', 'final-review'].includes(State.phase)) {
+      _requestWakeLock();
     }
   }
 });
@@ -232,7 +330,7 @@ function _checkOrientation() {
   const warn = document.getElementById('orientation-warn');
   if (!warn) return;
   const isLandscape = window.innerWidth > window.innerHeight;
-  const inCamera = ['countdown', 'recording', 'shutter', 'executing', 'processing', 'prepare'].includes(State.phase);
+  const inCamera = ['preview', 'countdown', 'recording', 'shutter', 'executing', 'processing', 'prepare', 'final-review', 'interrupted'].includes(State.phase);
   warn.style.display = (isLandscape && inCamera) ? 'flex' : 'none';
 }
 window.addEventListener('resize', _checkOrientation);
@@ -241,6 +339,7 @@ window.addEventListener('resize', _checkOrientation);
 
 function gotoSelect() {
   _clearTimers();
+  _releaseWakeLock();
   State.phase      = 'select';
   // BPMピッカーオーバーレイが残っていたら除去
   document.querySelectorAll('.bpm-picker-overlay').forEach(e => e.remove());
@@ -252,6 +351,12 @@ function gotoSelect() {
   State.maxCombo   = 0;
   State.lastWhipDir = null;
   State.transitionCommitted = false;
+  State.sceneFrames = [];
+  State.interruptedPhase = null;
+  State.interruptionNeedsRestart = false;
+  State.recordingStartedAt = 0;
+  State.recordingDurationMs = 0;
+  State.resumeDurationMs = 0;
 
   Motion.setActive(false);
   Audio.stop();
@@ -270,6 +375,9 @@ function gotoSelect() {
   UI.stopParticles();
   if (typeof UI.clearPulseTimers === 'function') UI.clearPulseTimers();
   UI.updateRemainingClips(0, CLIPS_NEEDED);
+  UI.setShootFlow(State.shootFlow);
+  UI.setCaptureAudio(State.captureAudio);
+  _refreshDeviceCheck();
 
   _resetBtn('btn-download');
 
@@ -412,11 +520,165 @@ function _setShootFlow(flow, persist) {
   }
 }
 
+function _getSavedCaptureAudio() {
+  try { return localStorage.getItem('shut_capture_audio') !== 'off'; } catch (_) { return true; }
+}
+
+function _setCaptureAudio(enabled, persist) {
+  State.captureAudio = enabled !== false;
+  UI.setCaptureAudio(State.captureAudio);
+  if (persist !== false) {
+    try { localStorage.setItem('shut_capture_audio', State.captureAudio ? 'on' : 'off'); } catch (_) {}
+  }
+  _refreshDeviceCheck();
+}
+
+function _getSavedCompositionGrid() {
+  try { return localStorage.getItem('shut_composition_grid') === 'on'; } catch (_) { return false; }
+}
+
+function _setCompositionGrid(enabled, persist) {
+  State.compositionGrid = !!enabled;
+  UI.setCompositionGrid(State.compositionGrid);
+  if (persist !== false) {
+    try { localStorage.setItem('shut_composition_grid', State.compositionGrid ? 'on' : 'off'); } catch (_) {}
+  }
+}
+
+async function _getPermissionState(name) {
+  if (!navigator.permissions || typeof navigator.permissions.query !== 'function') return 'unknown';
+  try {
+    const status = await navigator.permissions.query({ name: name });
+    return status && status.state ? status.state : 'unknown';
+  } catch (_) {
+    return 'unknown';
+  }
+}
+
+async function _refreshDeviceCheck() {
+  if (typeof UI === 'undefined' || typeof Recorder === 'undefined') return;
+  const requestId = ++_deviceCheckRequestId;
+  UI.renderDeviceCheck({
+    state: 'checking',
+    headline: '確認中...',
+    message: '撮影機能を確認しています。',
+    items: [],
+  });
+
+  const support = Recorder.getSupportInfo();
+  const mediaDevices = !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function');
+  const localHost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  const secure = window.isSecureContext || localHost;
+  const cameraPermission = await _getPermissionState('camera');
+  const microphonePermission = State.captureAudio ? await _getPermissionState('microphone') : 'off';
+  if (requestId !== _deviceCheckRequestId) return;
+
+  const cameraBlocked = cameraPermission === 'denied';
+  const microphoneBlocked = State.captureAudio && microphonePermission === 'denied';
+  const coreBlocked = !secure || !mediaDevices || !support.available || !support.mime || cameraBlocked;
+  const warning = !coreBlocked && (!support.pause || microphoneBlocked);
+  const format = support.mime.includes('mp4') ? 'MP4 / H.264' : support.mime.includes('webm') ? 'WebM' : '対応形式なし';
+  const motionAvailable = typeof DeviceMotionEvent !== 'undefined';
+  const wakeLockAvailable = 'wakeLock' in navigator;
+
+  const report = {
+    state: coreBlocked ? 'blocked' : warning ? 'warning' : 'ready',
+    headline: coreBlocked ? '設定を確認' : warning ? '一部制限あり' : '撮影準備OK',
+    message: coreBlocked
+      ? '未対応の項目を確認してから撮影してください。'
+      : warning
+        ? '動画撮影はできますが、一部の機能に制限があります。'
+        : 'このブラウザで撮影を開始できます。',
+    items: [
+      {
+        name: '安全な接続',
+        detail: secure ? 'カメラを利用できる接続です' : 'HTTPSで開き直してください',
+        badge: secure ? 'OK' : '必要',
+        status: secure ? 'ok' : 'blocked',
+      },
+      {
+        name: 'カメラ',
+        detail: !mediaDevices
+          ? 'このブラウザでは利用できません'
+          : cameraPermission === 'denied'
+            ? 'ブラウザ設定でカメラを許可してください'
+            : cameraPermission === 'granted' ? '利用許可済み' : '撮影開始時に確認します',
+        badge: !mediaDevices || cameraPermission === 'denied' ? '要設定' : cameraPermission === 'granted' ? 'OK' : '開始時',
+        status: !mediaDevices || cameraPermission === 'denied' ? 'blocked' : cameraPermission === 'granted' ? 'ok' : 'neutral',
+      },
+      {
+        name: '動画録画',
+        detail: support.mime ? format + 'で保存します' : '対応する録画形式がありません',
+        badge: support.available && support.mime ? 'OK' : '未対応',
+        status: support.available && support.mime ? 'ok' : 'blocked',
+      },
+      {
+        name: 'シーン切替',
+        detail: support.pause ? '移動中の映像を除外できます' : '一時停止非対応のため撮り直しが必要です',
+        badge: support.pause ? 'OK' : '制限あり',
+        status: support.pause ? 'ok' : 'warn',
+      },
+      {
+        name: 'モーション',
+        detail: motionAvailable ? (Motion.isEnabled() ? 'センサー利用可能' : '許可後に利用できます') : '画面タップで代替します',
+        badge: motionAvailable ? (Motion.isEnabled() ? 'OK' : '許可待ち') : 'タップ',
+        status: motionAvailable && Motion.isEnabled() ? 'ok' : 'neutral',
+      },
+      {
+        name: '収録音声',
+        detail: !State.captureAudio
+          ? '音声なしで撮影します'
+          : microphonePermission === 'denied'
+            ? 'ブラウザ設定でマイクを許可してください'
+            : microphonePermission === 'granted' ? '利用許可済み' : '撮影開始時に確認します',
+        badge: !State.captureAudio ? 'OFF' : microphonePermission === 'denied' ? '要設定' : microphonePermission === 'granted' ? 'OK' : '開始時',
+        status: !State.captureAudio ? 'neutral' : microphonePermission === 'denied' ? 'warn' : microphonePermission === 'granted' ? 'ok' : 'neutral',
+      },
+      {
+        name: '画面スリープ防止',
+        detail: wakeLockAvailable ? '撮影中の画面消灯を抑制します' : '端末の自動ロック時間に注意してください',
+        badge: wakeLockAvailable ? 'OK' : '手動',
+        status: wakeLockAvailable ? 'ok' : 'neutral',
+      },
+    ],
+  };
+  UI.renderDeviceCheck(report);
+  if (typeof Diagnostics !== 'undefined' && coreBlocked) {
+    Diagnostics.log('warn', 'device_check_blocked', {
+      secure: secure,
+      camera: mediaDevices && !cameraBlocked,
+      recorder: support.available,
+      mime: support.mime,
+    });
+  }
+}
+
+async function _copyDiagnostics() {
+  if (typeof Diagnostics === 'undefined') return false;
+  const ok = await Diagnostics.copyReport();
+  UI.showToast(ok ? '診断情報をコピーしました' : '診断情報をコピーできませんでした', 2200);
+  return ok;
+}
+
 async function startMode(mode) {
   _clearTimers();
+  State.phase      = 'preview';
   State.mode       = mode;
   State.clips      = 0;
   State.recEnabled = false;
+  State.sceneFrames = [];
+  State.scores = [];
+  State.combo = 0;
+  State.maxCombo = 0;
+  State.lastWhipDir = null;
+  State.transitionCommitted = false;
+  State.interruptedPhase = null;
+  State.interruptionNeedsRestart = false;
+  State.recordingStartedAt = 0;
+  State.recordingDurationMs = 0;
+  State.resumeDurationMs = 0;
+
+  _requestWakeLock();
 
   Motion.setActive(false);
   Motion.resetCooldown();
@@ -437,12 +699,13 @@ async function startMode(mode) {
   const camOk = await Camera.start(camEl);
 
   // await 中にフェーズが変わった場合（Escape等）はここで中断
-  if (State.mode !== mode) {
+  if (State.mode !== mode || State.phase !== 'preview') {
     Camera.stop();
     return;
   }
 
   if (!camOk) {
+    if (typeof Diagnostics !== 'undefined') Diagnostics.log('error', 'camera_start_failed');
     UI.showDummyBackground();
     // エラーの種類に応じてオーバーレイを表示
     const overlay = document.getElementById('cam-error-overlay');
@@ -458,39 +721,69 @@ async function startMode(mode) {
   const stream = Camera.getStream();
   if (camOk && stream) {
     try {
-      State.recEnabled = await Recorder.setup(stream);
-      if (State.recEnabled) UI.showToast('🔴 REC', 1500);
+      State.recEnabled = await Recorder.setup(stream, { includeAudio: State.captureAudio });
+      if (State.recEnabled) {
+        const audioLabel = State.captureAudio && Recorder.hasAudio() ? ' + MIC' : '';
+        UI.showToast('🔴 REC' + audioLabel, 1500);
+        if (State.captureAudio && !Recorder.hasAudio() && typeof Diagnostics !== 'undefined') {
+          Diagnostics.log('warn', 'microphone_unavailable');
+        }
+      }
     } catch (e) {
       console.warn('[App] Recorder 失敗:', e);
+      if (typeof Diagnostics !== 'undefined') Diagnostics.log('error', 'recorder_setup_failed', e.message);
     }
   }
 
   // カメラ映像が安定するまで少し待つ（0.8秒）
   // この間ユーザーは構図を確認できる
   UI.showCamPreviewHint();
-  _T(gotoCountdown, 1500); // 構図確認のため十分な時間を確保
+  _schedulePreviewCountdown();
 }
 
-// カメラフリップ — 録画中・countdown中は禁止
+function _schedulePreviewCountdown() {
+  _T(() => {
+    if (State.phase === 'preview') gotoCountdown();
+  }, PREVIEW_READY_MS);
+}
+
+// カメラフリップ — 撮影開始前のpreview中だけ許可
 async function _flipCamera() {
-  const blocked = ['countdown', 'recording', 'executing', 'processing', 'shutter', 'prepare'].includes(State.phase);
-  if (blocked) {
-    UI.showToast('⚠ 撮影中はカメラを切り替えられません', 2000);
+  if (State.phase !== 'preview' || !State.mode) {
+    UI.showToast('撮影開始前にカメラを切り替えてください', 2000);
     return;
   }
+
+  const mode = State.mode;
+  _clearTimers();
   UI.showToast('📷 切替中...', 1200);
   _vibrate(15);
   const ok = await Camera.flip();
-  if (!ok) { UI.showToast('⚠ カメラ切替に失敗しました'); return; }
-  UI.showToast(Camera.isRear() ? '📷 リアカメラ' : '🤳 フロントカメラ', 1500);
+  if (State.phase !== 'preview' || State.mode !== mode) return;
+  if (!ok) {
+    UI.showToast('カメラ切替に失敗しました');
+    _schedulePreviewCountdown();
+    return;
+  }
 
   // Recorder の映像トラックを更新（オーディオは再利用）
   if (State.recEnabled) {
     const stream = Camera.getStream();
     if (stream) {
-      State.recEnabled = await Recorder.setup(stream, { keepClips: true }).catch(() => false);
+      State.recEnabled = await Recorder.setup(stream, {
+        keepClips: true,
+        includeAudio: State.captureAudio,
+      }).catch(() => false);
     }
   }
+
+  if (State.phase !== 'preview' || State.mode !== mode) return;
+  if (!State.recEnabled && typeof Diagnostics !== 'undefined') {
+    Diagnostics.log('error', 'recorder_setup_after_flip_failed');
+  }
+  UI.showToast(Camera.isRear() ? 'リアカメラ' : 'フロントカメラ', 1500);
+  UI.showCamPreviewHint();
+  _schedulePreviewCountdown();
 }
 
 function gotoCountdown() {
@@ -544,7 +837,11 @@ function gotoRecording() {
   _checkOrientation();
 
   const m   = State.mode;
-  const dur = (60000 / m.bpm) * (m.beatsPerClip || 6);
+  const fullDuration = (60000 / m.bpm) * (m.beatsPerClip || 6);
+  const dur = State.resumeDurationMs > 0 ? State.resumeDurationMs : fullDuration;
+  State.resumeDurationMs = 0;
+  State.recordingStartedAt = performance.now();
+  State.recordingDurationMs = dur;
   let step = _getShotStep(State.clips);
 
   // クリップ開始時にREC枠フラッシュ（clips=0は白、clips>0は入り方向カラー）
@@ -577,10 +874,10 @@ function gotoRecording() {
   Audio.start(m.bpm, beatIdx => UI.beatPulse(beatIdx));
   // 1本の連続録画: 最初のクリップのみ start、以降は resume
   if (State.recEnabled) {
-    if (State.clips === 0) {
-      Recorder.startClip();
-    } else {
+    if (Recorder.isPaused()) {
       Recorder.resumeClip();
+    } else if (!Recorder.isRecording()) {
+      Recorder.startClip();
     }
   }
   // 実際の録画解像度を1.5秒表示
@@ -643,6 +940,7 @@ function gotoShutter() {
     Audio.playWarning();
     _vibrate([20, 20, 20]);
     _captureMatchGuide();
+    _captureSceneFrame(State.clips);
     if (State.recEnabled && Recorder.isRecording()) Recorder.pauseClip();
     UI.markClipDone(State.clips);
     State.clips++;
@@ -658,6 +956,7 @@ function executeShut(source) {
   _stopCoverDetection();
   UI.cancelShutterCountdown();
   _captureMatchGuide();
+  _captureSceneFrame(State.clips);
 
   // ── タイミング評価 ──────────────────────────────
   const offset = Audio.getTimingOffset(); // ビートとのズレ(ms)
@@ -774,6 +1073,48 @@ function _captureMatchGuide() {
   return UI.captureMatchGuide(video, !Camera.isRear());
 }
 
+function _captureSceneFrame(index) {
+  const video = document.getElementById('cam');
+  if (!video || !video.videoWidth || !video.videoHeight) return null;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 270;
+  canvas.height = 480;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const targetRatio = canvas.width / canvas.height;
+  const sourceRatio = video.videoWidth / video.videoHeight;
+  let sx = 0;
+  let sy = 0;
+  let sw = video.videoWidth;
+  let sh = video.videoHeight;
+  if (sourceRatio > targetRatio) {
+    sw = video.videoHeight * targetRatio;
+    sx = (video.videoWidth - sw) / 2;
+  } else {
+    sh = video.videoWidth / targetRatio;
+    sy = (video.videoHeight - sh) / 2;
+  }
+
+  ctx.save();
+  if (!Camera.isRear()) {
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  ctx.restore();
+
+  try {
+    const frame = canvas.toDataURL('image/jpeg', 0.72);
+    State.sceneFrames[index] = frame;
+    return frame;
+  } catch (error) {
+    if (typeof Diagnostics !== 'undefined') Diagnostics.log('warn', 'scene_frame_failed', error.message);
+    return null;
+  }
+}
+
 function _getShotStep(index) {
   if (!State.mode) return null;
   var shots = State.mode.shots && State.mode.shots.length
@@ -822,6 +1163,11 @@ function gotoPrepareNext() {
       : transition.ready,
     flowLabel: isContinuous ? 'CONTINUOUS' : 'MOVE & RESUME',
     buttonLabel: isContinuous ? '今すぐ再開' : '準備できたら撮影再開',
+    recordingState: isContinuous
+      ? '録画停止中・まもなく再開'
+      : '録画停止中・移動できます',
+    checkFrame: State.sceneFrames[State.clips - 1] || null,
+    retakeLabel: 'シーンAを撮り直す',
     autoResume: isContinuous,
     resumeMs: CONTINUOUS_RESUME_MS,
     matchGuide: State.mode && State.mode.id === 'match' && UI.hasMatchGuide(),
@@ -835,15 +1181,76 @@ function gotoPrepareNext() {
 }
 
 function startNextScene() {
+  if (State.phase === 'final-review') {
+    if (typeof Diagnostics !== 'undefined') Diagnostics.log('info', 'final_review_confirmed');
+    gotoComplete();
+    return;
+  }
+  if (State.phase === 'interrupted') {
+    resumeInterruptedCapture();
+    return;
+  }
   if (State.phase !== 'prepare') return;
+  _requestWakeLock();
   Audio.unlock();
   UI.hidePrepareNext();
   _vibrate(20);
   gotoCountdown();
 }
 
+function resumeInterruptedCapture() {
+  if (State.phase !== 'interrupted' || !State.mode) return;
+  const interruptedPhase = State.interruptedPhase;
+  const needsRestart = State.interruptionNeedsRestart;
+  const mode = State.mode;
+  State.interruptedPhase = null;
+  State.interruptionNeedsRestart = false;
+  UI.hidePrepareNext();
+  Audio.unlock();
+  _requestWakeLock();
+  if (typeof Diagnostics !== 'undefined') {
+    Diagnostics.log('info', needsRestart ? 'capture_restart_required' : 'capture_resumed', interruptedPhase);
+  }
+
+  if (needsRestart) {
+    Recorder.destroy();
+    Camera.stop();
+    startMode(mode);
+    return;
+  }
+
+  if (interruptedPhase === 'preview') {
+    Recorder.destroy();
+    Camera.stop();
+    startMode(mode);
+    return;
+  }
+
+  if (interruptedPhase === 'shutter') {
+    gotoShutter();
+    if (State.recEnabled) Recorder.resumeClip();
+    return;
+  }
+  gotoCountdown();
+}
+
+function retakeFirstScene() {
+  if (!['prepare', 'final-review', 'interrupted'].includes(State.phase) || !State.mode) return;
+  const mode = State.mode;
+  if (typeof Diagnostics !== 'undefined') {
+    Diagnostics.log('info', State.phase === 'final-review' ? 'final_review_restart' : 'scene_a_retake');
+  }
+  _vibrate([20, 20, 40]);
+  UI.hidePrepareNext();
+  UI.clearMatchGuide();
+  Recorder.destroy();
+  Camera.stop();
+  startMode(mode);
+}
+
 function finishFinalShot() {
   if (State.phase !== 'recording') return;
+  _captureSceneFrame(State.clips);
   State.phase = 'processing';
   Motion.setActive(false);
   Audio.stop();
@@ -853,12 +1260,43 @@ function finishFinalShot() {
   UI.setGuideText('最後の構図をそのままキープ', false);
   UI.setHudStatus('<strong>FINAL HOLD</strong> &nbsp; 保存準備中');
 
-  // 最後の余韻を録画に残してからMediaRecorderを確定する。
+  // 最後の余韻を残した後、録画を一時停止して保存前の構図確認へ進む。
   _T(() => {
     UI.markClipDone(State.clips);
     State.clips++;
-    gotoComplete();
+    const paused = !State.recEnabled || !Recorder.isRecording() || Recorder.pauseClip();
+    if (!paused && Recorder.isRecording()) {
+      if (typeof Diagnostics !== 'undefined') {
+        Diagnostics.log('warn', 'final_review_pause_failed');
+      }
+      gotoComplete();
+      return;
+    }
+    gotoFinalReview();
   }, 650);
+}
+
+function gotoFinalReview() {
+  State.phase = 'final-review';
+  UI.showMatchGuide(false);
+  UI.showPrepareNext({
+    scene: CLIPS_NEEDED,
+    total: CLIPS_NEEDED,
+    title: '最後のシーンを確認',
+    description: 'シーンBの最後の構図です。問題なければ完成へ進みます。',
+    ready: '撮り直す場合は、同じレシピを最初から撮影します。',
+    flowLabel: 'FINAL CHECK',
+    buttonLabel: 'この動画で完成',
+    recordingState: '録画停止中・最終確認',
+    checkFrame: State.sceneFrames[State.sceneFrames.length - 1] || null,
+    checkFrameLabel: 'SCENE B CHECK',
+    checkFrameAlt: 'シーンBの確認フレーム',
+    retakeLabel: '最初から撮り直す',
+    autoResume: false,
+    matchGuide: false,
+  });
+  if (typeof Diagnostics !== 'undefined') Diagnostics.log('info', 'final_review_shown');
+  _checkOrientation();
 }
 
 /**
@@ -896,6 +1334,7 @@ function _calcTitle(scores) {
 
 async function gotoComplete() {
   _clearTimers();
+  _releaseWakeLock();
   State.phase = 'complete';
   Motion.setActive(false);
   UI.hidePrepareNext();
@@ -917,6 +1356,13 @@ async function gotoComplete() {
   const _finalBlob = State.recEnabled ? Recorder.getFinalBlob() : null;
   const _saveFailed = State.recEnabled && (!stopResult.ok || !_finalBlob || _finalBlob.size === 0);
   State._cachedBlob = _finalBlob;
+  if (typeof Diagnostics !== 'undefined') {
+    Diagnostics.log(_saveFailed ? 'error' : 'info', _saveFailed ? 'recording_save_failed' : 'recording_complete', {
+      size: _finalBlob ? _finalBlob.size : 0,
+      reason: stopResult.reason || Recorder.getLastError(),
+      audio: Recorder.hasAudio(),
+    });
+  }
   const _shootTime  = new Date();
   const _scoreTitle = _saveFailed
     ? { title: '保存できませんでした', stars: 0 }
@@ -948,6 +1394,8 @@ async function gotoComplete() {
     isNewHi:  _isNewHi,
     recordingError: _saveFailed,
     recordingErrorReason: stopResult.reason || Recorder.getLastError(),
+    sceneFrames: State.sceneFrames.slice(),
+    audioRecorded: Recorder.hasAudio(),
   });
   UI.showScreen('complete');
 
@@ -1105,6 +1553,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // URLパラメータを先に処理
   const urlMode = _urlMode();
   _setShootFlow(_getSavedShootFlow(), false);
+  _setCaptureAudio(_getSavedCaptureAudio(), false);
+  _setCompositionGrid(_getSavedCompositionGrid(), false);
   _checkOrientation();
 
   // スプラッシュ → 次画面への遷移
@@ -1150,7 +1600,25 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  document.querySelectorAll('[data-capture-audio]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _setCaptureAudio(btn.dataset.captureAudio === 'on', true);
+      _vibrate(10);
+    });
+  });
+
   on('btn-next-scene', startNextScene);
+  on('btn-retake-scene', retakeFirstScene);
+  on('btn-device-check', () => {
+    const btn = document.getElementById('btn-device-check');
+    UI.setDeviceCheckExpanded(!btn || btn.getAttribute('aria-expanded') !== 'true');
+  });
+  on('btn-device-check-refresh', _refreshDeviceCheck);
+  on('btn-grid-guide', () => {
+    _setCompositionGrid(!State.compositionGrid, true);
+    _vibrate(10);
+    UI.showToast(State.compositionGrid ? '構図ガイド ON' : '構図ガイド OFF', 1400);
+  });
   on('btn-cancel-shoot', () => {
     _vibrate(15);
     gotoSelect();
@@ -1171,6 +1639,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (result === 'downloaded') UI.showToast('⬇ 保存しました！');
     if (result === 'shared')     UI.showToast('📤 シェアしました！');
     if (result === 'cancelled')  UI.showToast('キャンセルしました');
+    if (result === 'failed' && typeof Diagnostics !== 'undefined') {
+      Diagnostics.log('error', 'share_failed');
+    }
   });
 
   on('btn-copy-url', async () => {
@@ -1178,6 +1649,8 @@ document.addEventListener('DOMContentLoaded', () => {
     UI.showToast(ok ? '🔗 URLをコピーしました' : 'コピーに失敗しました');
     _vibrate(10);
   });
+  on('btn-copy-diagnostics', _copyDiagnostics);
+  on('btn-camera-diagnostics', _copyDiagnostics);
 
   on('btn-retry', () => { _vibrate(20); gotoSelect(); });
 
@@ -1304,6 +1777,7 @@ window.addEventListener('appinstalled', () => {
 
 // ── ページ終了時のリソース解放 ─────────────────────
 window.addEventListener('pagehide', () => {
+  _releaseWakeLock();
   Recorder.destroyAll();
   Camera.stop();
   Audio.stop();

@@ -1,8 +1,8 @@
 /**
- * sw.js — v43
- * 連続撮影と移動撮影の切替を配信するためキャッシュ更新。
+ * sw.js — v49
+ * 撮影前の端末チェックを配信するためキャッシュ更新。
  */
-const CACHE  = 'shut-v43';
+const CACHE  = 'shut-v49';
 const ASSETS = [
   '/',
   '/index.html',
@@ -14,6 +14,7 @@ const ASSETS = [
   '/ui.js',
   '/recorder.js',
   '/share.js',
+  '/diagnostics.js',
   '/app.js',
   '/manifest.json',
   '/icon-192.svg',

@@ -18,6 +18,7 @@ const Recorder = (() => {
   let _stopWatchdog = null;
   let _paused      = false;
   let _lastError   = null;
+  let _includeAudio = true;
 
   function _detectMime() {
     if (typeof MediaRecorder === 'undefined') return '';
@@ -93,9 +94,10 @@ const Recorder = (() => {
     if (typeof MediaRecorder === 'undefined') return false;
 
     _videoStream = videoStream;
+    _includeAudio = !options || options.includeAudio !== false;
 
     // オーディオトラックは一度取得したら再利用（ダイアログ再表示防止）
-    if (!_audioStream) {
+    if (_includeAudio && !_audioStream) {
       try {
         _audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         //console.log('[Recorder] マイク取得');
@@ -104,7 +106,12 @@ const Recorder = (() => {
       }
     }
 
-    _stream = _audioStream
+    if (!_includeAudio && _audioStream) {
+      _audioStream.getTracks().forEach(t => t.stop());
+      _audioStream = null;
+    }
+
+    _stream = _includeAudio && _audioStream
       ? new MediaStream([...videoStream.getVideoTracks(), ..._audioStream.getAudioTracks()])
       : videoStream;
 
@@ -158,16 +165,16 @@ const Recorder = (() => {
     });
   }
 
-  /** クリップ間の一時停止（pause非対応環境ではstopClipに自動フォールバック） */
+  /** クリップ間の一時停止。非対応時はfalseを返し、呼び出し側で撮り直しへ切り替える。 */
   function pauseClip() {
-    if (!_recorder || _recorder.state !== 'recording') return;
+    if (!_recorder || _recorder.state !== 'recording') return isPaused();
     try {
       _recorder.pause();
       _paused = true;
+      return true;
     } catch (e) {
-      // iOS Safari など pause 未対応環境: pause できなくても録画は継続
-      // gotoComplete で stopClip() が呼ばれるまでそのまま録画継続
-      console.warn('[Recorder] pause未対応、録画継続:', e.message);
+      console.warn('[Recorder] pause未対応:', e.message);
+      return false;
     }
   }
 
@@ -198,6 +205,16 @@ const Recorder = (() => {
   function isPaused()     { return _paused || (!!_recorder && _recorder.state === 'paused'); }
   function isBusy()       { return _busy; }
   function getLastError() { return _lastError; }
+  function hasAudio()     { return !!(_stream && _stream.getAudioTracks().some(t => t.readyState === 'live')); }
+  function getSupportInfo() {
+    const available = typeof MediaRecorder !== 'undefined';
+    const proto = available ? MediaRecorder.prototype : null;
+    return {
+      available: available,
+      mime: available ? _detectMime() : '',
+      pause: !!(proto && typeof proto.pause === 'function' && typeof proto.resume === 'function'),
+    };
+  }
 
   function reset() {
     if (_recorder) {
@@ -244,7 +261,8 @@ const Recorder = (() => {
   return {
     setup, startClip, stopClip, pauseClip, resumeClip,
     getFinalBlob, getClips, getMime,
-    getClipCount, isRecording, isPaused, isBusy, getLastError,
+    getClipCount, isRecording, isPaused, isBusy, getLastError, hasAudio,
+    getSupportInfo,
     reset, destroy, destroyAll,
   };
 })();

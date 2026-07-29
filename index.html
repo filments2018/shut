@@ -152,9 +152,31 @@
       </button>
     </div>
   </section>
+  <section class="capture-audio-selector" aria-labelledby="capture-audio-title">
+    <div class="capture-audio-title" id="capture-audio-title">収録音声</div>
+    <div class="capture-audio-options" role="group" aria-label="収録音声を選択">
+      <button type="button" class="capture-audio-btn active" data-capture-audio="on" aria-pressed="true">音声あり</button>
+      <button type="button" class="capture-audio-btn" data-capture-audio="off" aria-pressed="false">音声なし</button>
+    </div>
+  </section>
+  <section class="device-check" id="device-check" data-state="checking" aria-labelledby="device-check-title">
+    <button type="button" class="device-check-summary" id="btn-device-check" aria-expanded="false" aria-controls="device-check-details">
+      <span class="device-check-status-dot" aria-hidden="true"></span>
+      <span class="device-check-summary-copy">
+        <span class="device-check-title" id="device-check-title">端末チェック</span>
+        <span class="device-check-result" id="device-check-result">確認中...</span>
+      </span>
+      <span class="device-check-chevron" aria-hidden="true">⌄</span>
+    </button>
+    <div class="device-check-details" id="device-check-details" hidden>
+      <div class="device-check-message" id="device-check-message"></div>
+      <div class="device-check-list" id="device-check-list"></div>
+      <button type="button" class="device-check-refresh" id="btn-device-check-refresh">もう一度確認</button>
+    </div>
+  </section>
   <div class="modes" id="mode-list"></div>
   <div class="how-to-box">
-    撮影前に被写体を長押しして <strong>AE/AFロック</strong><br>
+    被写体を中央に置き、<strong>明るさとピント</strong>を確認<br>
     脇を締めて、手だけでなく腰から <strong>スマホを動かす</strong><br>
     <strong id="how-to-clips">2シーン</strong> をつないで動画が完成
   </div>
@@ -186,6 +208,7 @@
       onclick="document.getElementById('cam-error-overlay').style.display='none';">
       センサーのみで続ける
     </button>
+    <button class="btn-diagnostics" id="btn-camera-diagnostics">診断情報をコピー</button>
   </div>
 </div>
 
@@ -195,6 +218,12 @@
     <div class="vf-main" id="vf-main">
       <video id="cam" autoplay playsinline muted></video>
       <div class="vf-gradient"></div>
+      <div class="composition-grid" id="composition-grid" aria-hidden="true">
+        <span class="composition-grid-line grid-v grid-v1"></span>
+        <span class="composition-grid-line grid-v grid-v2"></span>
+        <span class="composition-grid-line grid-h grid-h1"></span>
+        <span class="composition-grid-line grid-h grid-h2"></span>
+      </div>
 
       <!-- MATCH: シーンAの終端をシーンBの構図合わせに重ねる -->
       <div class="match-guide" id="match-guide" role="img" aria-label="シーンAの構図ガイド" aria-hidden="true">
@@ -207,10 +236,19 @@
         <div class="shot-prepare-panel" role="dialog" aria-modal="true" aria-labelledby="shot-prepare-title">
           <div class="shot-prepare-kicker" id="shot-prepare-kicker">SCENE 2 / 2</div>
           <div class="shot-prepare-flow" id="shot-prepare-flow">MOVE &amp; RESUME</div>
+          <div class="shot-recording-state" id="shot-recording-state">
+            <span class="shot-recording-state-dot"></span>
+            <span id="shot-recording-state-text">録画停止中・移動できます</span>
+          </div>
           <div class="shot-prepare-title" id="shot-prepare-title">次のシーンを準備</div>
+          <div class="shot-prepare-frame" id="shot-prepare-frame" hidden>
+            <span id="shot-prepare-frame-label">SCENE A CHECK</span>
+            <img id="shot-prepare-frame-img" alt="シーンAの確認フレーム">
+          </div>
           <div class="shot-prepare-desc" id="shot-prepare-desc"></div>
           <div class="shot-prepare-ready" id="shot-prepare-ready"></div>
           <button class="btn-primary shot-prepare-start" id="btn-next-scene">START SCENE</button>
+          <button class="shot-prepare-retake" id="btn-retake-scene">シーンAを撮り直す</button>
           <button class="shot-prepare-cancel" id="btn-cancel-shoot">撮影をやめる</button>
         </div>
       </div>
@@ -250,6 +288,9 @@
       <!-- カメラ切替ボタン -->
       <button class="btn-flip" id="btn-flip" title="カメラ切替" aria-label="フロント・リアカメラ切替">🔄</button>
 
+      <!-- 3分割構図ガイド -->
+      <button class="btn-grid-guide" id="btn-grid-guide" title="構図ガイド" aria-label="3分割構図ガイドを表示" aria-pressed="false">▦</button>
+
       <div class="scanlines"></div>
     </div>
 
@@ -285,6 +326,9 @@
   <!-- フレーバーテキスト / タイムスタンプ -->
   <div class="complete-meta" id="complete-meta"></div>
 
+  <!-- シーンごとの確認フレーム -->
+  <div class="scene-checks" id="scene-checks" style="display:none"></div>
+
   <!-- 動画プレビュー（録画データがある場合のみ表示） -->
   <div id="video-preview-wrap" style="display:none"></div>
 
@@ -301,6 +345,7 @@
 
   <!-- サブアクション -->
   <button class="btn-copy-url" id="btn-copy-url">URLをコピー</button>
+  <button class="btn-diagnostics" id="btn-copy-diagnostics">動作ログをコピー</button>
   <button class="btn-install-pwa" id="btn-install-pwa">ホーム画面に追加</button>
 </div>
 
@@ -342,6 +387,7 @@
 <script src="ui.js"></script>
 <script src="recorder.js"></script>
 <script src="share.js"></script>
+<script src="diagnostics.js"></script>
 <script src="app.js"></script>
 
 </body>
