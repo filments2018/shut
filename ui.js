@@ -10,6 +10,10 @@
 const UI = (() => {
   const $ = id => document.getElementById(id);
 
+  function buildReviewCard(container, review, context = {}) {
+    return window.ReviewCard?.renderReviewCard?.(container, review, context) ?? null;
+  }
+
   // ── CSS変数でモード適用 ─────────────────────────
   function applyMode(mode) {
     const r = document.documentElement.style;
@@ -1494,5 +1498,6 @@ const UI = (() => {
     cleanupPreview: _cleanupPreview,
     stopParticles: _stopParticles,
     buildModeList,
+    buildReviewCard,
   };
 })();
