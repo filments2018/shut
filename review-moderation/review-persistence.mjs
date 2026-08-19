@@ -32,6 +32,18 @@ function requiredId(value, label) {
 export function createReviewPersistence(seed = {}) {
   const reviews = new Map(Object.entries(seed.reviews ?? {}));
   const reportKeys = new Set(seed.reportKeys ?? []);
+  const auditEvents = structuredClone(seed.auditEvents ?? []);
+
+  function recordAudit(action, reviewId, actorId, metadata = {}) {
+    auditEvents.push({
+      sequence: auditEvents.length + 1,
+      action,
+      reviewId,
+      actorId,
+      createdAt: new Date().toISOString(),
+      ...metadata,
+    });
+  }
 
   function getReview(reviewId) {
     const id = requiredId(reviewId, "reviewId");
@@ -53,6 +65,7 @@ export function createReviewPersistence(seed = {}) {
     }
     const next = applyModerationAction(review, action);
     reviews.set(review.id, next);
+    recordAudit(action.action, review.id, actorId);
     return structuredClone(next);
   }
 
@@ -107,6 +120,7 @@ export function createReviewPersistence(seed = {}) {
       throw new ReviewPersistenceError(code, error.message);
     }
     reportKeys.add(`${actorId}:${review.id}`);
+    recordAudit("report-review", review.id, actorId, { reason: action.payload.reason });
     return { ...action.payload, createdAt: action.createdAt };
   }
 
@@ -117,6 +131,7 @@ export function createReviewPersistence(seed = {}) {
     updateReply,
     deleteReply,
     reportReview,
-    snapshot: () => ({ reviews: structuredClone(Object.fromEntries(reviews)), reportKeys: [...reportKeys] }),
+    snapshot: () => ({ reviews: structuredClone(Object.fromEntries(reviews)), reportKeys: [...reportKeys], auditEvents: structuredClone(auditEvents) }),
+    auditLog: () => structuredClone(auditEvents),
   };
 }

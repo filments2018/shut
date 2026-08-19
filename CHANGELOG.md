@@ -10,7 +10,8 @@ All notable changes to SHUT are documented here.
 - Added the first browser-facing review card component with permission-aware edit, delete, reply, and report controls.
 - Added `UI.buildReviewCard()` as the framework-free PWA integration point.
 - Added `review-persistence.mjs`, an in-memory persistence adapter that validates actor authorization before applying review actions and keeps report uniqueness by reviewer and review.
-- Added deterministic tests for persistence authorization, action application, duplicate reports, and missing records.
+- Added deterministic tests for persistence authorization, action application, duplicate reports, missing records, audit ordering, and defensive audit snapshots.
+- Added in-memory audit events for successful review, reply, and report mutations with actor, review, action, timestamp, and sequence metadata.
 
 ### Changed
 
@@ -21,6 +22,8 @@ All notable changes to SHUT are documented here.
 ### Verification
 
 - The review moderation and persistence test suites pass with Node's built-in test runner.
+- 20 tests pass across the domain, persistence, and audit-event behavior.
+- Coverage is 98.40% lines, 88.24% branches, and 100% functions overall.
 - `git diff --check` passes.
 
 ### Follow-up
